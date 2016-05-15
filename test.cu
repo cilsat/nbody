@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <math.h>
+#include "vec_ops.h"
 
 #define NB 100  // number of bodies
 #define ND 3    // number of dimensions
@@ -19,6 +20,7 @@ typedef struct {
     float g;
 } nbodysys;
 
+
 nbodysys *init(int n) {
     int i, j;
     nbodysys *s = (nbodysys *)malloc(sizeof(nbodysys));
@@ -26,18 +28,16 @@ nbodysys *init(int n) {
     srand(time(NULL));
     s->x = (float3 *)malloc(n*sizeof(float3));
     s->m = (float *)malloc(n*sizeof(float));
-    s->v = (float *)malloc(n*ND*sizeof(float));
-    s->F = (float *)malloc(n*ND*sizeof(float));
+    s->v = (float3 *)malloc(n*sizeof(float3));
+    s->F = (float3 *)malloc(n*sizeof(float));
     s->num = n;
     s->g = 6.67408*pow(10, -11);
 
     for (i = 0; i < n; i++) {
-        for (j = 0; j < ND; j++) { 
-            s->x[i*ND + j] = MAX_VAL_X*((float) rand()/(float) RAND_MAX) - 0.5*MAX_VAL_X;
-            s->v[i*ND + j] = MAX_VAL_V*((float) rand()/(float) RAND_MAX);
-            s->F[i*ND + j] = 0;
-        }
-        s->m[i] = MAX_VAL_M*((float) rand()/(float) RAND_MAX);
+        s->x[i] = rand();
+        s->m[i] = MAX_VAL_M*((float) rand() / (float) RAND_MAX);
+        s->v[i] = rand();
+        s->F[i] = rand();
     }
 
     return s;
