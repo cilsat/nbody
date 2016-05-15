@@ -5,23 +5,22 @@
 #include <time.h>
 #include <stdlib.h>
 
-typedef struct {
+struct float3 {
     float x;
     float y;
     float z;
-} float3;
+};
 
-inline float3 make_float3(float x, float y, float z) {
-    float3 temp;
-    temp.x = x; temp.y = y; temp.z = z;
+inline float3 make_float3(const float &x, const float &y, const float &z) {
+    float3 temp = {x, y, z};
     return temp;
 }
 
 // ADDITION
-inline float3 operator+(const float3 &a, const float b) {
+inline float3 operator+(const float3 &a, const float &b) {
     return make_float3(a.x+b, a.y+b, a.z+b);
 }
-inline float3 operator+(const float b, const float3 &a) {
+inline float3 operator+(const float &b, const float3 &a) {
     return make_float3(a.x+b, a.y+b, a.z+b);
 }
 inline float3 operator+(const float3 &a, const float3 &b) {
@@ -35,10 +34,10 @@ inline void operator+=(float3 &a, const float &b) {
 }
 
 // SUBTRACTION
-inline float3 operator-(const float3 &a, const float b) {
+inline float3 operator-(const float3 &a, const float &b) {
     return make_float3(a.x-b, a.y-b, a.z-b);
 }
-inline float3 operator-(const float b, const float3 &a) {
+inline float3 operator-(const float &b, const float3 &a) {
     return make_float3(a.x-b, a.y-b, a.z-b);
 }
 inline float3 operator-(const float3 &a, const float3 &b) {
@@ -46,10 +45,10 @@ inline float3 operator-(const float3 &a, const float3 &b) {
 }
 
 // MULTIPLICATION
-inline float3 operator*(const float3 &a, const float b) {
+inline float3 operator*(const float3 &a, const float &b) {
     return make_float3(a.x*b, a.y*b, a.z*b);
 }
-inline float3 operator*(const float b, const float3 &a) {
+inline float3 operator*(const float &b, const float3 &a) {
     return make_float3(a.x*b, a.y*b, a.z*b);
 }
 inline float3 operator*(const float3 &b, const float3 &a) {
@@ -57,10 +56,10 @@ inline float3 operator*(const float3 &b, const float3 &a) {
 }
 
 // DIVISION
-inline float3 operator/(const float3 &a, const float b) {
+inline float3 operator/(const float3 &a, const float &b) {
     return make_float3(a.x/b, a.y/b, a.z/b);
 }
-inline float3 operator/(const float b, const float3 &a) {
+inline float3 operator/(const float &b, const float3 &a) {
     return make_float3(a.x/b, a.y/b, a.z/b);
 }
 inline float3 operator/(const float3 &a, const float3 &b) {

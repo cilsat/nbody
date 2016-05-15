@@ -183,12 +183,14 @@ int main(int argc, char **argv) {
     print(temp);
     }
 
+    /*
     dstart = omp_get_wtime();
     for (int i = 0; i < iters; i++) {
         update_full_seq(sys, (float)DEL);
     }
     dstop = omp_get_wtime();
     printf("%.3f\n", dstop-dstart);
+    */
 
     dstart = omp_get_wtime();
     for (int i = 0; i < iters; i++) {

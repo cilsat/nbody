@@ -24,12 +24,14 @@ int main(int argc, char **argv) {
         temp->print();
     }
 
+    /*
     dstart = omp_get_wtime();
     for (int i = 0; i < iters; i++) {
         sys->update_full_seq((float)DEL);
     }
     dstop = omp_get_wtime();
     printf("%.3f\n", dstop-dstart);
+    */
 
     dstart = omp_get_wtime();
     for (int i = 0; i < iters; i++) {

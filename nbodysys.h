@@ -20,7 +20,6 @@ class NBodySys {
         float3 *pos;
         float *mass;
         float3 *vel;
-        float3 *force;
         int num;
         float g;
 };
