@@ -7,8 +7,6 @@ class NBodySystem {
         NBodySystem(int nBodies) {}
         virtual ~NBodySystem() {}
 
-        virtual void update(T delta) = 0;
-
     protected:
         NBodySystem() {}    // default constructor
         

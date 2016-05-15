@@ -1,35 +1,74 @@
 #ifndef __VEC_OPS_H__
 #define __VEC_OPS_H__
 
-__device__ __host__ float3 operator+(const float3 &a, const float3 &b) {
+#include <math.h>
+#include <time.h>
+#include <stdlib.h>
+
+typedef struct {
+    float x;
+    float y;
+    float z;
+} float3;
+
+inline float3 make_float3(float x, float y, float z) {
+    float3 temp;
+    temp.x = x; temp.y = y; temp.z = z;
+    return temp;
+}
+
+// ADDITION
+inline float3 operator+(const float3 &a, const float b) {
+    return make_float3(a.x+b, a.y+b, a.z+b);
+}
+inline float3 operator+(const float b, const float3 &a) {
+    return make_float3(a.x+b, a.y+b, a.z+b);
+}
+inline float3 operator+(const float3 &a, const float3 &b) {
     return make_float3(a.x+b.x, a.y+b.y, a.z+b.z);
 }
 
-__device__ __host__ float3 operator-(const float3 &a, const float &b) {
-    return make_float3(a.x-b.x, a.y-b.y, a.z-b.z):
+// SUBTRACTION
+inline float3 operator-(const float3 &a, const float b) {
+    return make_float3(a.x-b, a.y-b, a.z-b);
+}
+inline float3 operator-(const float b, const float3 &a) {
+    return make_float3(a.x-b, a.y-b, a.z-b);
+}
+inline float3 operator-(const float3 &a, const float3 &b) {
+    return make_float3(a.x-b.x, a.y-b.y, a.z-b.z);
 }
 
-__device__ __host__ float3 operator*(const float3 &a, const float b) {
+// MULTIPLICATION
+inline float3 operator*(const float3 &a, const float b) {
+    return make_float3(a.x*b, a.y*b, a.z*b);
+}
+inline float3 operator*(const float b, const float3 &a) {
     return make_float3(a.x*b, a.y*b, a.z*b);
 }
 
-__device__ __host__ float3 operator*(const float b, const float3 &a) {
-    return make_float3(a.x*b, a.y*b, a.z*b);
+// DIVISION
+inline float3 operator/(const float3 &a, const float b) {
+    return make_float3(a.x/b, a.y/b, a.z/b);
 }
-
-__device__ __host__ float3 operator/(const float3 &a, const float b) {
+inline float3 operator/(const float b, const float3 &a) {
     return make_float3(a.x/b, a.y/b, a.z/b);
 }
 
-__device__ __host__ float3 operator/(const float b, const float3 &a) {
-    return make_float3(a.x/b, a.y/b, a.z/b);
+// MAGNITUDE
+inline float len_float3(const float3 &a) {
+    return pow(a.x*a.x + a.y*a.y + a.z*a.z, 0.5);
 }
 
-__device__ __host__ float3 rand() {
-    float x = (float) rand() / (float) RAND_MAX;
-    float y = (float) rand() / (float) RAND_MAX;
-    float z = (float) rand() / (float) RAND_MAX;
-
+// INSTANSIATION
+float3 const_float3(const float c) {
+    return make_float3(c, c, c);
+}
+float3 rand_float3(int max) {
+    srand(time(NULL));
+    float x = max*((float) rand() / (float) RAND_MAX);
+    float y = max*((float) rand() / (float) RAND_MAX);
+    float z = max*((float) rand() / (float) RAND_MAX);
     return make_float3(x, y, z);
 }
 
