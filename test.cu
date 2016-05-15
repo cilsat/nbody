@@ -11,9 +11,10 @@
 #define MAX_VAL_M 10    // maximum mass of body
 
 typedef struct {
-    float *x;
+    float3 *x;
     float *m;
-    float *v;
+    float3 *v;
+    float3 *F;
     int num;
     float g;
 } nbodysys;
@@ -23,16 +24,18 @@ nbodysys *init(int n) {
     nbodysys *s = (nbodysys *)malloc(sizeof(nbodysys));
 
     srand(time(NULL));
-    s->x = (float *)malloc(n*ND*sizeof(float));
+    s->x = (float3 *)malloc(n*sizeof(float3));
     s->m = (float *)malloc(n*sizeof(float));
     s->v = (float *)malloc(n*ND*sizeof(float));
+    s->F = (float *)malloc(n*ND*sizeof(float));
     s->num = n;
-    s->g = 6.6708*pow(10, -11);
+    s->g = 6.67408*pow(10, -11);
 
     for (i = 0; i < n; i++) {
         for (j = 0; j < ND; j++) { 
             s->x[i*ND + j] = MAX_VAL_X*((float) rand()/(float) RAND_MAX) - 0.5*MAX_VAL_X;
             s->v[i*ND + j] = MAX_VAL_V*((float) rand()/(float) RAND_MAX);
+            s->F[i*ND + j] = 0;
         }
         s->m[i] = MAX_VAL_M*((float) rand()/(float) RAND_MAX);
     }
@@ -49,14 +52,22 @@ void fin(nbodysys *s) {
 
 void update(nbodysys *s) {
     int i, j, k;
-    float n0, n1;
-    float *d = (float *) malloc(ND*sizeof(float));
-    float *f = (float *) malloc(n*ND*sizeof(float));
+    float d, f, a;
+    float *xr = (float *) malloc(ND*sizeof(float));
+    float *a = (float *) malloc(ND*sizeof(float));
 
     for (i = 0; i < n; i++) {
         for (j = 0; j < n; j++) {
+            d = 0;
             for (k = 0; k < ND; k++) {
-                d[k] = s->x[j*ND + k] - s->x[i*ND + k];
+                xr[k] = s->x[j*ND + k] - s->x[i*ND + k];
+                d += powf(xr[k], 2);
+            }
+            d = powf(d, 0.5);
+            f = s->g*(s->m[j] - s->m[i])/d;
+            for (k = 0; k < ND; k++) {
+                a[k] = 
+
                 
 
 void print(nbodysys *s) {
