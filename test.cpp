@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <omp.h>
 #include "vec_ops.h"
 
@@ -10,6 +11,7 @@
 #define MAX_VAL_V 10    // maximum (initial) velocity
 #define MAX_VAL_M 10    // maximum mass of body
 #define G 6.67408e-11   // universal gravitational constant
+#define DEBUG 0
 
 typedef struct {
     float3 *x;
@@ -21,12 +23,12 @@ typedef struct {
 
 nbodysys *init(int n) {
     int i;
-    nbodysys *s = (nbodysys *)malloc(sizeof(nbodysys));
+    nbodysys *s = new nbodysys;
 
     srand(time(NULL));
-    s->x = (float3 *)malloc(n*sizeof(float3));
-    s->m = (float *)malloc(n*sizeof(float));
-    s->v = (float3 *)malloc(n*sizeof(float3));
+    s->x = new float3[n];
+    s->m = new float[n];
+    s->v = new float3[n];
     s->num = n;
     s->g = 1.f;
 
@@ -40,10 +42,42 @@ nbodysys *init(int n) {
 }
 
 void fin(nbodysys *s) {
-    free(s->x);
-    free(s->m);
-    free(s->v);
-    free(s);
+    delete[] s->x;
+    delete[] s->m;
+    delete[] s->v;
+    delete s;
+}
+
+nbodysys *copy(nbodysys *s) {
+    int n = s->num;
+    nbodysys *temp = init(n);
+
+    memcpy(temp->x, s->x, n*sizeof(float3));
+    memcpy(temp->m, s->m, n*sizeof(float));
+    memcpy(temp->v, s->v, n*sizeof(float3));
+    temp->num = n;
+    temp->g = s->g;
+
+    return temp;
+}
+
+void print(nbodysys *s) {
+    int i;
+    int n = s->num;
+
+    printf("\n");
+    for (i = 0; i < n; i++) {
+        printf("%.3f %.3f %.3f\n", s->x[i].x, s->x[i].y, s->x[i].z);
+    }
+    printf("\n");
+    for (i = 0; i < n; i++) {
+        printf("%.3f %.3f %.3f\n", s->v[i].x, s->v[i].y, s->v[i].z);
+    }
+    printf("\n");
+    for (i = 0; i < n; i++) {
+        printf("%.3f ", s->m[i]);
+    }
+    printf("\n");
 }
 
 void update_full_seq(nbodysys *s, float t) {
@@ -66,7 +100,7 @@ void update_full_seq(nbodysys *s, float t) {
                 // ^r12 = r12/|r12|
                 float3 u = xr/r;
                 // F = G*m1*m2*^r12/|r12|
-                float3 f = u*(g*s->m[i]*s->m[j]/r);
+                float3 f = u*g*s->m[i]*s->m[j]/r;
                 F[i] = F[i] + f;
                 F[j] = F[j] - f;
             }
@@ -109,7 +143,7 @@ void update_full_par(nbodysys *s, float t) {
                 // ^r12 = r12/|r12|
                 float3 u = xr/r;
                 // F = G*m1*m2*^r12/|r12|
-                float3 f = u*(g*s->m[i]*s->m[j]/r);
+                float3 f = u*g*s->m[i]*s->m[j]/r;
                 F[i] = F[i] + f;
                 F[j] = F[j] - f;
             }
@@ -131,25 +165,6 @@ void update_full_par(nbodysys *s, float t) {
     free(F);
 }
 
-void print(nbodysys *s) {
-    int i;
-    int n = s->num;
-
-    printf("\n");
-    for (i = 0; i < n; i++) {
-        printf("%.3f %.3f %.3f\n", s->x[i].x, s->x[i].y, s->x[i].z);
-    }
-    printf("\n");
-    for (i = 0; i < n; i++) {
-        printf("%.3f %.3f %.3f\n", s->v[i].x, s->v[i].y, s->v[i].z);
-    }
-    printf("\n");
-    for (i = 0; i < n; i++) {
-        printf("%.3f ", s->m[i]);
-    }
-    printf("\n");
-}
-
 int main(int argc, char **argv) {
     double dstart, dstop;
     int nb, iters;
@@ -161,6 +176,12 @@ int main(int argc, char **argv) {
         nb = NB; iters = ITERS;
     }
     nbodysys *sys = init(nb);
+    nbodysys *temp = copy(sys);
+
+    if (DEBUG == 1) {
+    print(sys);
+    print(temp);
+    }
 
     dstart = omp_get_wtime();
     for (int i = 0; i < iters; i++) {
@@ -171,11 +192,18 @@ int main(int argc, char **argv) {
 
     dstart = omp_get_wtime();
     for (int i = 0; i < iters; i++) {
-        update_full_par(sys, (float)DEL);
+        update_full_par(temp, (float)DEL);
     }
     dstop = omp_get_wtime();
     printf("%.3f\n", dstop-dstart);
+
+    if (DEBUG == 1) {
+        print(sys);
+        print(temp);
+    }
+
     fin(sys);
+    fin(temp);
 
     return 0;
 }
