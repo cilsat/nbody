@@ -3,7 +3,6 @@
 #define NB 1000  // number of bodies
 #define ITERS 100   // number of iterations
 #define DEL 1   // (integer) length of time steps in seconds
-#define DEBUG 0
 
 int main(int argc, char **argv) {
     double dstart, dstop;
@@ -17,17 +16,25 @@ int main(int argc, char **argv) {
     }
 
     NBodySys *sys = new NBodySys(nb);
-    NBodySys *temp = sys;
+    NBodySys *temp = new NBodySys(nb);
+    temp->copy(sys);
 
     if (DEBUG == 1) {
-        sys->print();
+        //sys->print();
         temp->print();
     }
 
     /*
     dstart = omp_get_wtime();
     for (int i = 0; i < iters; i++) {
-        sys->update_full_seq((float)DEL);
+        sys->allpairs_seq((float)DEL);
+    }
+    dstop = omp_get_wtime();
+    printf("%.3f\n", dstop-dstart);
+
+    dstart = omp_get_wtime();
+    for (int i = 0; i < iters; i++) {
+        temp->allpairs_par((float)DEL);
     }
     dstop = omp_get_wtime();
     printf("%.3f\n", dstop-dstart);
@@ -35,13 +42,13 @@ int main(int argc, char **argv) {
 
     dstart = omp_get_wtime();
     for (int i = 0; i < iters; i++) {
-        temp->update_full_par((float)DEL);
+        temp->barneshut_seq((float)DEL);
     }
     dstop = omp_get_wtime();
     printf("%.3f\n", dstop-dstart);
 
     if (DEBUG == 1) {
-        sys->print();
+        //sys->print();
         temp->print();
     }
 

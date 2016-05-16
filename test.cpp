@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <omp.h>
-#include "vec_ops.h"
+#include "vec_ops.hpp"
 
 #define NB 1000  // number of bodies
 #define ITERS 100   // number of iterations

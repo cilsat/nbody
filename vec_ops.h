@@ -18,7 +18,8 @@ inline float3 make_float3(const float &x, const float &y, const float &z) {
 
 // ADDITION
 inline float3 operator+(const float3 &a, const float &b) {
-    return make_float3(a.x+b, a.y+b, a.z+b);
+    float3 temp = {a.x+b, a.y+b, a.z+b};
+    return temp;
 }
 inline float3 operator+(const float &b, const float3 &a) {
     return make_float3(a.x+b, a.y+b, a.z+b);
@@ -37,22 +38,25 @@ inline void operator+=(float3 &a, const float &b) {
 inline float3 operator-(const float3 &a, const float &b) {
     return make_float3(a.x-b, a.y-b, a.z-b);
 }
-inline float3 operator-(const float &b, const float3 &a) {
-    return make_float3(a.x-b, a.y-b, a.z-b);
+inline float3 operator-(const float &a, const float3 &b) {
+    return make_float3(a-b.x, a-b.y, a-b.z);
 }
 inline float3 operator-(const float3 &a, const float3 &b) {
-    return make_float3(a.x-b.x, a.y-b.y, a.z-b.z);
+    float3 temp = {a.x-b.x, a.y-b.y, a.z-b.z};
+    return temp;
 }
 
 // MULTIPLICATION
 inline float3 operator*(const float3 &a, const float &b) {
-    return make_float3(a.x*b, a.y*b, a.z*b);
+    float3 temp = {a.x*b, a.y*b, a.z*b};
+    return temp;
 }
-inline float3 operator*(const float &b, const float3 &a) {
-    return make_float3(a.x*b, a.y*b, a.z*b);
+inline float3 operator*(const float &a, const float3 &b) {
+    return make_float3(a*b.x, a*b.y, a*b.z);
 }
 inline float3 operator*(const float3 &b, const float3 &a) {
-    return make_float3(a.x*b.x, a.y*b.y, a.z*b.z);
+    float3 temp = {a.x*b.x, a.y*b.y, a.z*b.z};
+    return temp;
 }
 
 // DIVISION
@@ -67,8 +71,8 @@ inline float3 operator/(const float3 &a, const float3 &b) {
 }
 
 // MAGNITUDE
-inline float len_float3(const float3 &a) {
-    return pow(a.x*a.x + a.y*a.y + a.z*a.z, 0.5);
+inline float invsqrt_float3(const float3 &a) {
+    return 1.f/sqrtf(a.x*a.x + a.y*a.y + a.z*a.z);
 }
 
 // INSTANSIATION
