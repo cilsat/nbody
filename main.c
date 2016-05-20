@@ -5,8 +5,7 @@
 #define MAX_P 100
 #define MAX_V 10
 #define MAX_M 100
-#define UPDATE all_seq
-#define DEBUG 0
+#define UPDATE barnes
 
 int main(int argc, char **argv) {
     int num_bodies, num_iters;
@@ -26,9 +25,7 @@ int main(int argc, char **argv) {
     if (DEBUG == 1) print_nbodysys(nbody);
 
     dstart = omp_get_wtime();
-    for (int i = 0; i < num_iters; i++) {
-        f(nbody, 1.f);
-    }
+    f(nbody, num_iters, 1.f);
     dstop = omp_get_wtime();
 
     if (DEBUG == 1) print_nbodysys(nbody);
