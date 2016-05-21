@@ -36,9 +36,6 @@ typedef struct node {
 typedef struct nbodysys {
     body_t *bodies;
     int num_bodies;
-    float *p;
-    float *v;
-    float *m;
     float maxp, maxv, maxm;
 } nbodysys_t;
 
@@ -58,6 +55,7 @@ void check_node(node_t*, body_t*);
 
 // nbodysys methods
 nbodysys_t *init_rand_bodysys(int, float, float, float);
+nbodysys_t *copy_bodysys(nbodysys_t*);
 void fin_nbodysys(nbodysys_t*);
 void print_nbodysys(nbodysys_t*);
 
