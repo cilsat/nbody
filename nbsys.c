@@ -9,7 +9,6 @@
 // debugging
 static int node_id;
 static int debug;
-static int temp;
 
 body_t *init_rand_body(float max_p, float max_v, float max_m) {
     body_t *temp = (body_t*)malloc(sizeof(body_t));
@@ -177,20 +176,20 @@ void check_node(node_t* node, body_t* body) {
     float rx = node->cx - body->px;
     float ry = node->cy - body->py;
     float rz = node->cz - body->pz;
-    float dist = rx*rx + ry+ry + rz*rz;
-    float ratio = node->length/sqrtf(dist);
+    double dist = rx*rx + ry*ry + rz*rz;
+    double ratio = node->length/sqrtf(dist);
 
     if (dist <= 0.f) {}
     else if ((ratio < DIST_THRES) | (node->num_child == 0)) {
-        temp++;
+        //node_counter++;
         //assert((node->bodies[0].px == node->cx) | (node->num_bodies > 1));
-        float r = dist + E_SQR;
-        float gmr = G*node->tm/sqrtf(r*r*r);
+        double r = dist + E_SQR;
+        double gmr = G*node->tm/sqrtf(r*r*r);
         body->ax += gmr*rx;
         body->ay += gmr*ry;
         body->az += gmr*rz;
     }
-    else {
+    else {  // dist > 0 & ratio > THRES & node->num_child > 0
         for (int i = 0; i < node->num_child; i++) {
             check_node(&node->child[i], body);
         }
@@ -296,8 +295,8 @@ void all_seq(nbodysys_t *nb, int iters, del_t time) {
                     float rx = p[j*3] - p[x];
                     float ry = p[j*3+1] - p[y];
                     float rz = p[j*3+2] - p[z];
-                    float r = rx*rx + ry*ry + rz*rz + E_SQR;
-                    float gmr = gm[j]/sqrtf(r*r*r);
+                    double r = rx*rx + ry*ry + rz*rz + E_SQR;
+                    double gmr = gm[j]/sqrtf(r*r*r);
                     a[x] += gmr*rx;
                     a[y] += gmr*ry;
                     a[z] += gmr*rz;
@@ -339,10 +338,10 @@ void barnes(nbodysys_t *nb, int iters, del_t time) {
     int n = nb->num_bodies;
     node_t *root = init_node(0, 16);
     float max;
-    omp_set_nested(1);
+    //omp_set_nested(1);
 
     for (iter = 0; iter < iters*time; iter += time) {
-        max = temp = 0;
+        max = 0;
         node_id = 1;
         for (i = 0; i < n; i++) {
             max = fabs(nb->bodies[i].px) > max ? fabs(nb->bodies[i].px) : max;
@@ -350,7 +349,7 @@ void barnes(nbodysys_t *nb, int iters, del_t time) {
             max = fabs(nb->bodies[i].pz) > max ? fabs(nb->bodies[i].pz) : max;
         }
         set_node_members(root, nb->bodies, 0, 0, 0, max*2, nb->num_bodies);
-#pragma omp parallel for
+//#pragma omp parallel for
         for (i = 0; i < nb->num_bodies; i++) {
             check_node(root, &nb->bodies[i]);
             update_p(&nb->bodies[i], time);
@@ -358,7 +357,6 @@ void barnes(nbodysys_t *nb, int iters, del_t time) {
         if (debug == 2) {
             print_node_members(root);
         }
-        //printf("ext nodes:%d\n", temp);
 
         free_node(root);
     }
