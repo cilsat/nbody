@@ -4,11 +4,12 @@
 #define G 1.f     // universal gravitational constant should be 6.67408e-11
 #define E_SQR 1.f // softening factor
 #define DEBUG 0
-#define DIST_THRES 0.5f
+#define DIST_THRES 0.f
 
 // debugging
 static int node_id;
 static int debug;
+static int temp;
 
 body_t *init_rand_body(float max_p, float max_v, float max_m) {
     body_t *temp = (body_t*)malloc(sizeof(body_t));
@@ -78,9 +79,9 @@ void set_node_members(node_t *node, body_t *p_bodies, float p_x, float p_y, floa
         float t_cz = 0;
         for (i = 0; i < p_nbodies; i++) {
             float t_m = node->bodies[i].m;
-            t_cx += p_x*t_m;
-            t_cy += p_y*t_m;
-            t_cz += p_z*t_m;
+            t_cx += node->bodies[i].px*t_m;
+            t_cy += node->bodies[i].py*t_m;
+            t_cz += node->bodies[i].pz*t_m;
             t_tm += t_m;
         }
         node->tm = t_tm;
@@ -106,7 +107,7 @@ void set_node_members(node_t *node, body_t *p_bodies, float p_x, float p_y, floa
         node->cx = node->bodies[0].px;
         node->cy = node->bodies[0].py;
         node->cz = node->bodies[0].pz;
-        node->tm = p_bodies[0].m;
+        node->tm = node->bodies[0].m;
         node->num_child = 0;
         node->child = 0;
     }
@@ -126,7 +127,7 @@ void set_node_children(node_t *node) {
         }
     }
 
-//#pragma omp parallel for
+    //#pragma omp parallel for
     for (i = 0; i < node->num_bodies; i++) {
         // derive quadrant q=0..7 from relative position of body to center on each axis
         int b_x = node->bodies[i].px < node->px ? 0 : 1;
@@ -134,7 +135,7 @@ void set_node_children(node_t *node) {
         int b_z = node->bodies[i].pz < node->pz ? 0 : 1;
         int q = b_x*4 + b_y*2 + b_z;
 
-//#pragma omp critical
+        //#pragma omp critical
         {
             // keep track of number of bodies in each quadrant q
             n_quad[q]++;
@@ -173,26 +174,25 @@ void set_node_children(node_t *node) {
 }
 
 void check_node(node_t* node, body_t* body) {
-    if (node->num_bodies > 0) {
-        float rx = node->cx - body->px;
-        float ry = node->cy - body->py;
-        float rz = node->cz - body->pz;
-        float dist = rx*rx + ry+ry + rz*rz;
-        float ratio = node->length/sqrtf(dist);
+    float rx = node->cx - body->px;
+    float ry = node->cy - body->py;
+    float rz = node->cz - body->pz;
+    float dist = rx*rx + ry+ry + rz*rz;
+    float ratio = node->length/sqrtf(dist);
 
-        if (dist <= 0.f) {}
-        else if ((ratio < DIST_THRES) | (node->num_child == 0)) {
-            //assert((node->bodies[0].px == node->cx) | (node->num_bodies > 1));
-            float r = dist + E_SQR;
-            float gmr = G*node->tm/sqrtf(r*r*r);
-            body->ax += gmr*rx;
-            body->ay += gmr*ry;
-            body->az += gmr*rz;
-        }
-        else {
-            for (int i = 0; i < node->num_child; i++) {
-                check_node(&node->child[i], body);
-            }
+    if (dist <= 0.f) {}
+    else if ((ratio < DIST_THRES) | (node->num_child == 0)) {
+        temp++;
+        //assert((node->bodies[0].px == node->cx) | (node->num_bodies > 1));
+        float r = dist + E_SQR;
+        float gmr = G*node->tm/sqrtf(r*r*r);
+        body->ax += gmr*rx;
+        body->ay += gmr*ry;
+        body->az += gmr*rz;
+    }
+    else {
+        for (int i = 0; i < node->num_child; i++) {
+            check_node(&node->child[i], body);
         }
     }
 }
@@ -207,10 +207,14 @@ void print_node_members(node_t *node) {
             for (int j = 0; j < node->depth; j++) {
                 printf("\t");
             }
-            printf("  %.3f %.3f %.3f\n", node->bodies[i].px, node->bodies[i].py, node->bodies[i].pz);
+            printf("  %.3f %.3f %.3f %.3f\n", node->bodies[i].px, node->bodies[i].py, node->bodies[i].pz, node->tm);
         }
     } else {
         printf("%d %d %.3f %.3f %.3f %.3f\n", node->id, node->num_bodies, node->px, node->py, node->pz, node->length);
+        for (int j = 0; j < node->depth; j++) {
+            printf("\t");
+        }
+        printf("%d %.3f %.3f %.3f %.3f\n", node->depth, node->cx, node->cy, node->cz, node->tm);
         for (int i = 0; i < node->num_child; i++) {
             print_node_members(&node->child[i]);
         }
@@ -338,7 +342,7 @@ void barnes(nbodysys_t *nb, int iters, del_t time) {
     omp_set_nested(1);
 
     for (iter = 0; iter < iters*time; iter += time) {
-        max = 0;
+        max = temp = 0;
         node_id = 1;
         for (i = 0; i < n; i++) {
             max = fabs(nb->bodies[i].px) > max ? fabs(nb->bodies[i].px) : max;
@@ -354,6 +358,7 @@ void barnes(nbodysys_t *nb, int iters, del_t time) {
         if (debug == 2) {
             print_node_members(root);
         }
+        //printf("ext nodes:%d\n", temp);
 
         free_node(root);
     }
