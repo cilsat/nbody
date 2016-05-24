@@ -9,6 +9,7 @@
 // debugging
 static int node_id;
 static int debug;
+static int node_counter;
 
 body_t *init_rand_body(float max_p, float max_v, float max_m) {
     body_t *temp = (body_t*)malloc(sizeof(body_t));
@@ -27,16 +28,13 @@ body_t *init_rand_body(float max_p, float max_v, float max_m) {
 }
 
 inline void update_p(body_t* b, del_t t) {
-    float ht = 0.5*t;
-    float ux = b->vx;
-    float uy = b->vy;
-    float uz = b->vz;
+    float ht = 0.5f*t;
     b->vx += b->ax*t;
     b->vy += b->ay*t;
     b->vz += b->az*t;
-    b->px += (b->vx - ux)*ht;
-    b->py += (b->vy - uy)*ht;
-    b->pz += (b->vz - uz)*ht;
+    b->px += b->vx*ht;
+    b->py += b->vy*ht;
+    b->pz += b->vz*ht;
 }
 
 void free_body(body_t *body) {
@@ -138,7 +136,7 @@ void set_node_children(node_t *node) {
         {
             // keep track of number of bodies in each quadrant q
             n_quad[q]++;
-            // keep track of which quadrant each body belongs to
+            // keep track of all bodies in each quadrant q
             c_quad[q][n_quad[q]-1] = i;
         }
     }
@@ -181,10 +179,10 @@ void check_node(node_t* node, body_t* body) {
 
     if (dist <= 0.f) {}
     else if ((ratio < DIST_THRES) | (node->num_child == 0)) {
-        //node_counter++;
+        node_counter++;
         //assert((node->bodies[0].px == node->cx) | (node->num_bodies > 1));
         double r = dist + E_SQR;
-        double gmr = G*node->tm/sqrtf(r*r*r);
+        double gmr = (G*node->tm)/sqrtf(r*r*r);
         body->ax += gmr*rx;
         body->ay += gmr*ry;
         body->az += gmr*rz;
@@ -260,6 +258,30 @@ void print_nbodysys(nbodysys_t *nb) {
     printf("\n");
 }
 
+void brute(nbodysys_t *nb, int iters, del_t time) {
+    int iter, i, j;
+
+    for (iter = 0; iter < iters*time; iter += time) {
+#pragma omp parallel for
+        for (i = 0; i < nb->num_bodies; i++) {
+#pragma omp parallel for
+            for (j = 0; j < nb->num_bodies; j++) {
+                if (i != j) {
+                    float rx = nb->bodies[j].px - nb->bodies[i].px;
+                    float ry = nb->bodies[j].py - nb->bodies[i].py;
+                    float rz = nb->bodies[j].pz - nb->bodies[i].pz;
+                    double r = rx*rx + ry*ry + rz*rz + E_SQR;
+                    double gmr = G*nb->bodies[j].m/sqrtf(r*r*r);
+                    nb->bodies[i].ax += gmr*rx;
+                    nb->bodies[i].ay += gmr*ry;
+                    nb->bodies[i].az += gmr*rz;
+                }
+            }
+            update_p(&nb->bodies[i], time);
+        }
+    }
+}
+
 void all_seq(nbodysys_t *nb, int iters, del_t time) {
     int n = nb->num_bodies;
     int iter, i, j;
@@ -283,13 +305,13 @@ void all_seq(nbodysys_t *nb, int iters, del_t time) {
         gm[i] = G*nb->bodies[i].m;
     }
 
-    for (iter = 0; iter < iters; iter++) {
-#pragma omp parallel for
+    for (iter = 0; iter < iters*time; iter += time) {
+//#pragma omp parallel for
         for (i = 0; i < n; i++) {
             int x = i*3;
             int y = i*3+1;
             int z = i*3+2;
-#pragma omp parallel for
+//#pragma omp parallel for
             for (j = 0; j < n; j++) {
                 if (i != j) {
                     float rx = p[j*3] - p[x];
@@ -302,15 +324,12 @@ void all_seq(nbodysys_t *nb, int iters, del_t time) {
                     a[z] += gmr*rz;
                 }
             }
-            float ux = v[x];
-            float uy = v[y];
-            float uz = v[z];
             v[x] += a[x]*time;
             v[y] += a[y]*time;
             v[z] += a[z]*time;
-            p[x] += (v[x] - ux)*ht;
-            p[y] += (v[y] - uy)*ht;
-            p[z] += (v[z] - uz)*ht;
+            p[x] += v[x]*ht;
+            p[y] += v[y]*ht;
+            p[z] += v[z]*ht;
         }
     }
 
@@ -351,8 +370,10 @@ void barnes(nbodysys_t *nb, int iters, del_t time) {
         set_node_members(root, nb->bodies, 0, 0, 0, max*2, nb->num_bodies);
 //#pragma omp parallel for
         for (i = 0; i < nb->num_bodies; i++) {
+            node_counter = 0;
             check_node(root, &nb->bodies[i]);
             update_p(&nb->bodies[i], time);
+            //printf("%d\n", node_counter);
         }
         if (debug == 2) {
             print_node_members(root);

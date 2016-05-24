@@ -60,6 +60,7 @@ void fin_nbodysys(nbodysys_t*);
 void print_nbodysys(nbodysys_t*);
 
 // update methods
+void brute(nbodysys_t*, int iter, del_t);
 void all_seq(nbodysys_t*, int iter, del_t);
 void barnes(nbodysys_t*, int iter, del_t);
 

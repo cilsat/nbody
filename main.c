@@ -12,6 +12,7 @@ static struct option long_opt[] = {
     {"file", required_argument, NULL, 'f'},
     {"bodies", required_argument, NULL, 'n'},
     {"iterations", required_argument, NULL, 'i'},
+    {"method", required_argument, NULL, 'm'},
     {"max-pos", required_argument, NULL, 'P'},
     {"max-vel", required_argument, NULL, 'V'},
     {"max-mass", required_argument, NULL, 'M'},
@@ -114,10 +115,19 @@ int main(int argc, char **argv) {
     printf("\n%.5f\n", dstop-dstart);
 
     dstart = omp_get_wtime();
-    barnes(copy, num_iters, 1.f);
+    brute(copy, num_iters, 1.f);
     dstop = omp_get_wtime();
     if (debug == 1) print_nbodysys(copy);
     printf("\n%.5f\n", dstop-dstart);
+
+    if (debug == 3) {
+        for (int i = 0; i < nbody->num_bodies; i++ ) {
+            float dx = nbody->bodies[i].px - copy->bodies[i].px;
+            float dy = nbody->bodies[i].py - copy->bodies[i].py;
+            float dz = nbody->bodies[i].pz - copy->bodies[i].pz;
+            printf("%d %.5f %.5f %.5f\n", i, dx, dy, dz);
+        }
+    }
 
     free_nbodysys(nbody);
     free_nbodysys(copy);
