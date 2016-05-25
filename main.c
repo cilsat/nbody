@@ -62,9 +62,9 @@ int main(int argc, char **argv) {
     int c;
     char *filename=0;
     int num_bodies=NUM_BODIES, num_iters=NUM_ITERS;
-    float maxp=MAX_P, maxv=MAX_V, maxm=MAX_M;
+    double maxp=MAX_P, maxv=MAX_V, maxm=MAX_M;
     double dstart, dstop;
-    nbodysys_t *nbody;
+    nbodysys_t *nb;
 
     while ((c = getopt_long(argc, argv, short_opt, long_opt, NULL)) != -1) {
         switch(c) {
@@ -97,40 +97,58 @@ int main(int argc, char **argv) {
         }
     }
 
-    nbody = init_rand_nbodysys(num_bodies, maxp, maxv, maxm);
+    nb = init_rand_nbodysys(num_bodies, maxp, maxv, maxm);
     if (filename != 0) {
-        read_file(nbody, filename);
+        read_file(nb, filename);
     }
 
-    nbodysys_t *copy = copy_bodysys(nbody);
+    nbodysys_t *nb1 = copy_bodysys(nb);
+    nbodysys_t *nb2 = copy_bodysys(nb);
     
     if (debug == 1) {
-        print_nbodysys(nbody);
+        print_nbodysys(nb);
     }
 
     dstart = omp_get_wtime();
-    all_seq(nbody, num_iters, 1.f);
+    all_seq(nb, num_iters, 1.f);
     dstop = omp_get_wtime();
-    if (debug == 1) print_nbodysys(nbody);
+    if (debug == 1) print_nbodysys(nb);
     printf("\n%.5f\n", dstop-dstart);
 
     dstart = omp_get_wtime();
-    brute(copy, num_iters, 1.f);
+    brute(nb1, num_iters, 1.f);
     dstop = omp_get_wtime();
-    if (debug == 1) print_nbodysys(copy);
+    if (debug == 1) print_nbodysys(nb1);
+    printf("\n%.5f\n", dstop-dstart);
+
+    dstart = omp_get_wtime();
+    barnes(nb2, num_iters, 1.f);
+    dstop = omp_get_wtime();
+    if (debug == 1) print_nbodysys(nb2);
     printf("\n%.5f\n", dstop-dstart);
 
     if (debug == 3) {
-        for (int i = 0; i < nbody->num_bodies; i++ ) {
-            float dx = nbody->bodies[i].px - copy->bodies[i].px;
-            float dy = nbody->bodies[i].py - copy->bodies[i].py;
-            float dz = nbody->bodies[i].pz - copy->bodies[i].pz;
-            printf("%d %.5f %.5f %.5f\n", i, dx, dy, dz);
+        double dx = 0;
+        double dy = 0;
+        double dz = 0;
+        int n = nb->num_bodies;
+        for (int i = 0; i < n; i++ ) {
+            dx += fabs(nb->bodies[i].px - nb1->bodies[i].px);
+            dy += fabs(nb->bodies[i].py - nb1->bodies[i].py);
+            dz += fabs(nb->bodies[i].pz - nb1->bodies[i].pz);
         }
+        printf("%.9f %.9f %.9f\n", dx/n, dy/n, dz/n);
+        dx = 0; dy = 0; dz = 0;
+        for (int i = 0; i < n; i++ ) {
+            dx += fabs(nb1->bodies[i].px - nb2->bodies[i].px);
+            dy += fabs(nb1->bodies[i].py - nb2->bodies[i].py);
+            dz += fabs(nb1->bodies[i].pz - nb2->bodies[i].pz);
+        }
+        printf("%.9f %.9f %.9f\n", dx/n, dy/n, dz/n);
     }
 
-    free_nbodysys(nbody);
-    free_nbodysys(copy);
+    free_nbodysys(nb);
+    free_nbodysys(nb1);
 
     return 0;
 }

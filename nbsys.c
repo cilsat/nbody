@@ -1,34 +1,35 @@
 #include "nbsys.h"
 #include <assert.h>
 
-#define G 1.f     // universal gravitational constant should be 6.67408e-11
-#define E_SQR 1.f // softening factor
-#define DEBUG 0
+#define G 0.1f // universal gravitational constant should be 6.67408e-11
+#define E 50.f
+#define E_SQR E*E // softening factor
+#define DEBUG 2
 #define DIST_THRES 0.f
 
 // debugging
 static int node_id;
 static int debug;
-static int node_counter;
+//static int node_counter;
 
-body_t *init_rand_body(float max_p, float max_v, float max_m) {
+body_t *init_rand_body(double max_p, double max_v, double max_m) {
     body_t *temp = (body_t*)malloc(sizeof(body_t));
-    temp->px = max_p*((float) rand() / (float) RAND_MAX) - 0.5*max_p;
-    temp->py = max_p*((float) rand() / (float) RAND_MAX) - 0.5*max_p;
-    temp->pz = max_p*((float) rand() / (float) RAND_MAX) - 0.5*max_p;
-    temp->vx = max_v*((float) rand() / (float) RAND_MAX) - 0.5*max_v;
-    temp->vy = max_v*((float) rand() / (float) RAND_MAX) - 0.5*max_v;
-    temp->vz = max_v*((float) rand() / (float) RAND_MAX) - 0.5*max_v;
+    temp->px = max_p*((double)rand() / (double)RAND_MAX) - 0.5*max_p;
+    temp->py = max_p*((double)rand() / (double)RAND_MAX) - 0.5*max_p;
+    temp->pz = max_p*((double)rand() / (double)RAND_MAX) - 0.5*max_p;
+    temp->vx = max_v*((double)rand() / (double)RAND_MAX) - 0.5*max_v;
+    temp->vy = max_v*((double)rand() / (double)RAND_MAX) - 0.5*max_v;
+    temp->vz = max_v*((double)rand() / (double)RAND_MAX) - 0.5*max_v;
     temp->ax = 0;
     temp->ay = 0;
     temp->az = 0;
-    temp->m = max_m*((float) rand() / (float) RAND_MAX);
+    temp->m = max_m*((double) rand() / (double) RAND_MAX);
 
     return temp;
 }
 
 inline void update_p(body_t* b, del_t t) {
-    float ht = 0.5f*t;
+    double ht = 0.5f*t;
     b->vx += b->ax*t;
     b->vy += b->ay*t;
     b->vz += b->az*t;
@@ -59,7 +60,7 @@ void free_node(node_t *n) {
     free(n->child);
 }
 
-void set_node_members(node_t *node, body_t *p_bodies, float p_x, float p_y, float p_z, float p_length, int p_nbodies) {
+void set_node_members(node_t *node, body_t *p_bodies, double p_x, double p_y, double p_z, double p_length, int p_nbodies) {
     if (p_nbodies > 1) {
         int i;
         node->px = p_x;
@@ -70,19 +71,19 @@ void set_node_members(node_t *node, body_t *p_bodies, float p_x, float p_y, floa
         node->bodies = (body_t*)malloc(p_nbodies*sizeof(body_t));
         memcpy(node->bodies, p_bodies, p_nbodies*sizeof(body_t));
 
-        float t_tm = 0;
-        float t_cx = 0;
-        float t_cy = 0;
-        float t_cz = 0;
+        double t_tm = 0;
+        double t_cx = 0;
+        double t_cy = 0;
+        double t_cz = 0;
         for (i = 0; i < p_nbodies; i++) {
-            float t_m = node->bodies[i].m;
+            double t_m = node->bodies[i].m;
             t_cx += node->bodies[i].px*t_m;
             t_cy += node->bodies[i].py*t_m;
             t_cz += node->bodies[i].pz*t_m;
             t_tm += t_m;
         }
         node->tm = t_tm;
-        float invtm = 1.f/t_tm;
+        double invtm = 1.f/t_tm;
         node->cx = t_cx*invtm;
         node->cy = t_cy*invtm;
         node->cz = t_cz*invtm;
@@ -153,9 +154,9 @@ void set_node_children(node_t *node) {
             int m_x = i/4 == 0 ? -1 : 1;
             int m_y = (i/2)%2 == 0 ? -1 : 1;
             int m_z = i%2 == 0 ? -1 : 1;
-            float new_px = node->px + m_x*0.25f*node->length;
-            float new_py = node->py + m_y*0.25f*node->length;
-            float new_pz = node->pz + m_z*0.25f*node->length;
+            double new_px = node->px + m_x*0.25f*node->length;
+            double new_py = node->py + m_y*0.25f*node->length;
+            double new_pz = node->pz + m_z*0.25f*node->length;
 
             node_t *t_node = init_node(node->depth+1, node->max_depth);
             set_node_members(t_node, quad[i], new_px, new_py, new_pz, node->length*0.5, n_quad[i]);
@@ -171,21 +172,20 @@ void set_node_children(node_t *node) {
 }
 
 void check_node(node_t* node, body_t* body) {
-    float rx = node->cx - body->px;
-    float ry = node->cy - body->py;
-    float rz = node->cz - body->pz;
-    double dist = rx*rx + ry*ry + rz*rz;
-    double ratio = node->length/sqrtf(dist);
+    double rx = node->cx - body->px;
+    double ry = node->cy - body->py;
+    double rz = node->cz - body->pz;
+    double r = sqrt(rx*rx + ry*ry + rz*rz + E_SQR);
+    double ratio = node->length/r;
 
-    if (dist <= 0.f) {}
+    if (r <= E) {}
     else if ((ratio < DIST_THRES) | (node->num_child == 0)) {
-        node_counter++;
-        //assert((node->bodies[0].px == node->cx) | (node->num_bodies > 1));
-        double r = dist + E_SQR;
-        double gmr = (G*node->tm)/sqrtf(r*r*r);
+        double gmr = G*node->tm/(r*r*r);
+        //printf("%d %.9f %.9f %.9f %.9f\n", node_counter, body->ax, gmr*rx, gmr*ry, gmr*rz);
         body->ax += gmr*rx;
         body->ay += gmr*ry;
         body->az += gmr*rz;
+        //node_counter++;
     }
     else {  // dist > 0 & ratio > THRES & node->num_child > 0
         for (int i = 0; i < node->num_child; i++) {
@@ -218,7 +218,7 @@ void print_node_members(node_t *node) {
     }
 }
 
-nbodysys_t *init_rand_nbodysys(int n, float max_p, float max_v, float max_m) {
+nbodysys_t *init_rand_nbodysys(int n, double max_p, double max_v, double max_m) {
     int i;
 
     nbodysys_t *temp = (nbodysys_t*)malloc(sizeof(nbodysys_t));
@@ -260,18 +260,17 @@ void print_nbodysys(nbodysys_t *nb) {
 
 void brute(nbodysys_t *nb, int iters, del_t time) {
     int iter, i, j;
-
     for (iter = 0; iter < iters*time; iter += time) {
-#pragma omp parallel for
+#pragma omp parallel for private(j)
         for (i = 0; i < nb->num_bodies; i++) {
 #pragma omp parallel for
             for (j = 0; j < nb->num_bodies; j++) {
                 if (i != j) {
-                    float rx = nb->bodies[j].px - nb->bodies[i].px;
-                    float ry = nb->bodies[j].py - nb->bodies[i].py;
-                    float rz = nb->bodies[j].pz - nb->bodies[i].pz;
-                    double r = rx*rx + ry*ry + rz*rz + E_SQR;
-                    double gmr = G*nb->bodies[j].m/sqrtf(r*r*r);
+                    double rx = nb->bodies[j].px - nb->bodies[i].px;
+                    double ry = nb->bodies[j].py - nb->bodies[i].py;
+                    double rz = nb->bodies[j].pz - nb->bodies[i].pz;
+                    double r = sqrt(rx*rx + ry*ry + rz*rz + E_SQR);
+                    double gmr = G*nb->bodies[j].m/(r*r*r);
                     nb->bodies[i].ax += gmr*rx;
                     nb->bodies[i].ay += gmr*ry;
                     nb->bodies[i].az += gmr*rz;
@@ -285,11 +284,11 @@ void brute(nbodysys_t *nb, int iters, del_t time) {
 void all_seq(nbodysys_t *nb, int iters, del_t time) {
     int n = nb->num_bodies;
     int iter, i, j;
-    float ht = 0.5f*time;
-    float *p = (float*)malloc(n*3*sizeof(float));
-    float *v = (float*)malloc(n*3*sizeof(float));
-    float *a = (float*)malloc(n*3*sizeof(float));
-    float *gm = (float*)malloc(n*sizeof(float));
+    double ht = 0.5f*time;
+    double *p = (double*)malloc(n*3*sizeof(double));
+    double *v = (double*)malloc(n*3*sizeof(double));
+    double *a = (double*)malloc(n*3*sizeof(double));
+    double *gm = (double*)malloc(n*sizeof(double));
 
     for (i = 0; i < nb->num_bodies; i++) {
         int in = i*3;
@@ -306,19 +305,19 @@ void all_seq(nbodysys_t *nb, int iters, del_t time) {
     }
 
     for (iter = 0; iter < iters*time; iter += time) {
-//#pragma omp parallel for
+#pragma omp parallel for private(j)
         for (i = 0; i < n; i++) {
             int x = i*3;
             int y = i*3+1;
             int z = i*3+2;
-//#pragma omp parallel for
+#pragma omp parallel for private(j)
             for (j = 0; j < n; j++) {
                 if (i != j) {
-                    float rx = p[j*3] - p[x];
-                    float ry = p[j*3+1] - p[y];
-                    float rz = p[j*3+2] - p[z];
-                    double r = rx*rx + ry*ry + rz*rz + E_SQR;
-                    double gmr = gm[j]/sqrtf(r*r*r);
+                    double rx = p[j*3] - p[x];
+                    double ry = p[j*3+1] - p[y];
+                    double rz = p[j*3+2] - p[z];
+                    double r = sqrt(rx*rx + ry*ry + rz*rz + E_SQR);
+                    double gmr = gm[j]/(r*r*r);
                     a[x] += gmr*rx;
                     a[y] += gmr*ry;
                     a[z] += gmr*rz;
@@ -356,8 +355,8 @@ void barnes(nbodysys_t *nb, int iters, del_t time) {
     int i, iter;
     int n = nb->num_bodies;
     node_t *root = init_node(0, 16);
-    float max;
-    //omp_set_nested(1);
+    double max;
+    omp_set_nested(1);
 
     for (iter = 0; iter < iters*time; iter += time) {
         max = 0;
@@ -368,9 +367,9 @@ void barnes(nbodysys_t *nb, int iters, del_t time) {
             max = fabs(nb->bodies[i].pz) > max ? fabs(nb->bodies[i].pz) : max;
         }
         set_node_members(root, nb->bodies, 0, 0, 0, max*2, nb->num_bodies);
-//#pragma omp parallel for
+#pragma omp parallel for
         for (i = 0; i < nb->num_bodies; i++) {
-            node_counter = 0;
+            //node_counter = 0;
             check_node(root, &nb->bodies[i]);
             update_p(&nb->bodies[i], time);
             //printf("%d\n", node_counter);

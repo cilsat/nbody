@@ -8,23 +8,23 @@
 #include <math.h>
 #include <omp.h>
 
-typedef float del_t;
-typedef float dist_t;
+typedef double del_t;
+typedef double dist_t;
 
 typedef struct body {
-    float px, py, pz;
-    float vx, vy, vz;
-    float ax, ay, az;
-    float m;
+    double px, py, pz;
+    double vx, vy, vz;
+    double ax, ay, az;
+    double m;
 } body_t;
 
 typedef struct node {
     int id;
-    float px, py, pz;
-    float cx, cy, cz;
-    float tm;
+    double px, py, pz;
+    double cx, cy, cz;
+    double tm;
 
-    float length;
+    double length;
     int depth, max_depth;
 
     body_t *bodies;
@@ -36,25 +36,25 @@ typedef struct node {
 typedef struct nbodysys {
     body_t *bodies;
     int num_bodies;
-    float maxp, maxv, maxm;
+    double maxp, maxv, maxm;
 } nbodysys_t;
 
 typedef void (*update) (nbodysys_t *nb, int iters, del_t time);
 
 // body methods
-body_t *init_rand_body(float, float, float);
+body_t *init_rand_body(double, double, double);
 void update_p(body_t*, del_t);
 
 // node methods
 node_t *init_node(int, int);
 void fin_node(node_t*);
-void set_node_members(node_t*, body_t*, float, float, float, float, int);
+void set_node_members(node_t*, body_t*, double, double, double, double, int);
 void set_node_children(node_t*);
 void print_node_members(node_t*);
 void check_node(node_t*, body_t*);
 
 // nbodysys methods
-nbodysys_t *init_rand_bodysys(int, float, float, float);
+nbodysys_t *init_rand_bodysys(int, double, double, double);
 nbodysys_t *copy_bodysys(nbodysys_t*);
 void fin_nbodysys(nbodysys_t*);
 void print_nbodysys(nbodysys_t*);
