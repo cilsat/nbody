@@ -10,7 +10,7 @@
 // debugging
 static int node_id;
 static int debug;
-//static int node_counter;
+static int node_counter;
 
 body_t *init_rand_body(double max_p, double max_v, double max_m) {
     body_t *temp = (body_t*)malloc(sizeof(body_t));
@@ -185,7 +185,8 @@ void check_node(node_t* node, body_t* body) {
         body->ax += gmr*rx;
         body->ay += gmr*ry;
         body->az += gmr*rz;
-        //node_counter++;
+#pragma omp atomic
+        node_counter++;
     }
     else {  // dist > 0 & ratio > THRES & node->num_child > 0
         for (int i = 0; i < node->num_child; i++) {
@@ -332,7 +333,7 @@ void all_seq(nbodysys_t *nb, int iters, del_t time) {
         }
     }
 
-    for (i = 0; i < nb->num_bodies; i++) {
+    for (i = 0; i < n; i++) {
         int in = i*3;
         nb->bodies[i].px = p[in];
         nb->bodies[i].py = p[in+1];
@@ -356,7 +357,7 @@ void barnes(nbodysys_t *nb, int iters, del_t time) {
     int n = nb->num_bodies;
     node_t *root = init_node(0, 16);
     double max;
-    omp_set_nested(1);
+    //omp_set_nested(1);
 
     for (iter = 0; iter < iters*time; iter += time) {
         max = 0;
@@ -369,15 +370,14 @@ void barnes(nbodysys_t *nb, int iters, del_t time) {
         set_node_members(root, nb->bodies, 0, 0, 0, max*2, nb->num_bodies);
 #pragma omp parallel for
         for (i = 0; i < nb->num_bodies; i++) {
-            //node_counter = 0;
+            node_counter = 0;
             check_node(root, &nb->bodies[i]);
             update_p(&nb->bodies[i], time);
-            //printf("%d\n", node_counter);
+            printf("%d\n", node_counter);
         }
         if (debug == 2) {
             print_node_members(root);
         }
-
         free_node(root);
     }
     free(root);
