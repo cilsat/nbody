@@ -2,7 +2,10 @@
 #include <assert.h>
 
 #define G 0.1f // universal gravitational constant should be 6.67408e-11
-#define E 10.f
+#define MAX_P 100
+#define MAX_V 10
+#define MAX_M 100
+#define E MAX_P
 #define E_SQR E*E // softening factor
 #define DEBUG 2
 #define DIST_THRES 0.f

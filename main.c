@@ -3,9 +3,6 @@
 
 #define NUM_BODIES 16
 #define NUM_ITERS 10
-#define MAX_P 100
-#define MAX_V 10
-#define MAX_M 100
 #define UPDATE barnes
 
 static struct option long_opt[] = {
@@ -132,30 +129,26 @@ int main(int argc, char **argv) {
         double dx = 0;
         double dy = 0;
         double dz = 0;
-        double dgmr1 = 0;
-        double dgmr2 = 0;
         int n = nb->num_bodies;
         for (int i = 0; i < n; i++ ) {
-            dgmr1 += nb->bodies[i].gmr;
-            dgmr2 += nb1->bodies[i].gmr;
+            dx += nb->bodies[i].ax - nb2->bodies[i].ax;
+            dy += nb->bodies[i].ay - nb2->bodies[i].ay;
+            dz += nb->bodies[i].az - nb2->bodies[i].az;
             //dx += fabs(nb->bodies[i].gmr - nb1->bodies[i].gmr);
             //dy += fabs(nb->bodies[i].gmr - nb1->bodies[i].gmr);
             //dz += fabs(nb->bodies[i].gmr - nb1->bodies[i].gmr);
         }
-        printf("%.9f %.9f %.9f\n", fabs(dgmr1-dgmr2)/dgmr1, dgmr1, dgmr2);
-        //printf("%.9f %.9f %.9f\n", dx/n, dy/n, dz/n);
+        printf("%.9f %.9f %.9f\n", dx/n, dy/n, dz/n);
         dx = 0; dy = 0; dz = 0;
-        dgmr1 = 0;
-        dgmr2 = 0;
         for (int i = 0; i < n; i++ ) {
-            dgmr1 += nb1->bodies[i].gmr;
-            dgmr2 += nb2->bodies[i].gmr;
+            dx += nb1->bodies[i].ax - nb2->bodies[i].ax;
+            dy += nb1->bodies[i].ay - nb2->bodies[i].ay;
+            dz += nb1->bodies[i].az - nb2->bodies[i].az;
             //dx += fabs(nb1->bodies[i].gmr - nb2->bodies[i].gmr);
             //dy += fabs(nb1->bodies[i].gmr - nb2->bodies[i].gmr);
             //dz += fabs(nb1->bodies[i].gmr - nb2->bodies[i].gmr);
         }
-        //printf("%.9f %.9f %.9f\n", dx/n, dy/n, dz/n);
-        printf("%.9f %.9f %.9f\n", fabs(dgmr1-dgmr2)/dgmr1, dgmr1, dgmr2);
+        printf("%.9f %.9f %.9f\n", dx/n, dy/n, dz/n);
     }
 
     free_nbodysys(nb);
