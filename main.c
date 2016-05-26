@@ -102,6 +102,7 @@ int main(int argc, char **argv) {
         read_file(nb, filename);
     }
 
+    //nbodysys_t *nb1 = init_rand_nbodysys(num_bodies, maxp, maxv, maxm);
     nbodysys_t *nb1 = copy_bodysys(nb);
     nbodysys_t *nb2 = copy_bodysys(nb);
     
@@ -131,24 +132,35 @@ int main(int argc, char **argv) {
         double dx = 0;
         double dy = 0;
         double dz = 0;
+        double dgmr1 = 0;
+        double dgmr2 = 0;
         int n = nb->num_bodies;
         for (int i = 0; i < n; i++ ) {
-            dx += fabs(nb->bodies[i].px - nb1->bodies[i].px);
-            dy += fabs(nb->bodies[i].py - nb1->bodies[i].py);
-            dz += fabs(nb->bodies[i].pz - nb1->bodies[i].pz);
+            dgmr1 += nb->bodies[i].gmr;
+            dgmr2 += nb1->bodies[i].gmr;
+            //dx += fabs(nb->bodies[i].gmr - nb1->bodies[i].gmr);
+            //dy += fabs(nb->bodies[i].gmr - nb1->bodies[i].gmr);
+            //dz += fabs(nb->bodies[i].gmr - nb1->bodies[i].gmr);
         }
-        printf("%.9f %.9f %.9f\n", dx/n, dy/n, dz/n);
+        printf("%.9f %.9f %.9f\n", fabs(dgmr1-dgmr2)/dgmr1, dgmr1, dgmr2);
+        //printf("%.9f %.9f %.9f\n", dx/n, dy/n, dz/n);
         dx = 0; dy = 0; dz = 0;
+        dgmr1 = 0;
+        dgmr2 = 0;
         for (int i = 0; i < n; i++ ) {
-            dx += fabs(nb1->bodies[i].px - nb2->bodies[i].px);
-            dy += fabs(nb1->bodies[i].py - nb2->bodies[i].py);
-            dz += fabs(nb1->bodies[i].pz - nb2->bodies[i].pz);
+            dgmr1 += nb1->bodies[i].gmr;
+            dgmr2 += nb2->bodies[i].gmr;
+            //dx += fabs(nb1->bodies[i].gmr - nb2->bodies[i].gmr);
+            //dy += fabs(nb1->bodies[i].gmr - nb2->bodies[i].gmr);
+            //dz += fabs(nb1->bodies[i].gmr - nb2->bodies[i].gmr);
         }
-        printf("%.9f %.9f %.9f\n", dx/n, dy/n, dz/n);
+        //printf("%.9f %.9f %.9f\n", dx/n, dy/n, dz/n);
+        printf("%.9f %.9f %.9f\n", fabs(dgmr1-dgmr2)/dgmr1, dgmr1, dgmr2);
     }
 
     free_nbodysys(nb);
     free_nbodysys(nb1);
+    free_nbodysys(nb2);
 
     return 0;
 }

@@ -2,7 +2,7 @@
 #include <assert.h>
 
 #define G 0.1f // universal gravitational constant should be 6.67408e-11
-#define E 50.f
+#define E 10.f
 #define E_SQR E*E // softening factor
 #define DEBUG 2
 #define DIST_THRES 0.f
@@ -24,6 +24,7 @@ body_t *init_rand_body(double max_p, double max_v, double max_m) {
     temp->ay = 0;
     temp->az = 0;
     temp->m = max_m*((double) rand() / (double) RAND_MAX);
+    temp->gmr = 0;
 
     return temp;
 }
@@ -185,7 +186,7 @@ void check_node(node_t* node, body_t* body) {
         body->ax += gmr*rx;
         body->ay += gmr*ry;
         body->az += gmr*rz;
-#pragma omp atomic
+        body->gmr += gmr;
         node_counter++;
     }
     else {  // dist > 0 & ratio > THRES & node->num_child > 0
@@ -272,6 +273,7 @@ void brute(nbodysys_t *nb, int iters, del_t time) {
                     double rz = nb->bodies[j].pz - nb->bodies[i].pz;
                     double r = sqrt(rx*rx + ry*ry + rz*rz + E_SQR);
                     double gmr = G*nb->bodies[j].m/(r*r*r);
+                    nb->bodies[i].gmr += gmr;
                     nb->bodies[i].ax += gmr*rx;
                     nb->bodies[i].ay += gmr*ry;
                     nb->bodies[i].az += gmr*rz;
@@ -319,6 +321,7 @@ void all_seq(nbodysys_t *nb, int iters, del_t time) {
                     double rz = p[j*3+2] - p[z];
                     double r = sqrt(rx*rx + ry*ry + rz*rz + E_SQR);
                     double gmr = gm[j]/(r*r*r);
+                    nb->bodies[i].gmr += gmr;
                     a[x] += gmr*rx;
                     a[y] += gmr*ry;
                     a[z] += gmr*rz;
@@ -369,11 +372,11 @@ void barnes(nbodysys_t *nb, int iters, del_t time) {
         }
         set_node_members(root, nb->bodies, 0, 0, 0, max*2, nb->num_bodies);
 #pragma omp parallel for
-        for (i = 0; i < nb->num_bodies; i++) {
+        for (i = 0; i < n; i++) {
             node_counter = 0;
             check_node(root, &nb->bodies[i]);
             update_p(&nb->bodies[i], time);
-            printf("%d\n", node_counter);
+            //printf("%d\n", node_counter);
         }
         if (debug == 2) {
             print_node_members(root);
