@@ -5,15 +5,15 @@
 #define MAX_P 100
 #define MAX_V 10
 #define MAX_M 100
-#define E MAX_P
+#define E 0.5*MAX_P
 #define E_SQR E*E // softening factor
 #define DEBUG 2
-#define DIST_THRES 0.f
+#define DIST_THRES 0.15
 
 // debugging
 static int node_id;
 static int debug;
-static int node_counter;
+//static int node_counter;
 
 body_t *init_rand_body(double max_p, double max_v, double max_m) {
     body_t *temp = (body_t*)malloc(sizeof(body_t));
@@ -27,7 +27,6 @@ body_t *init_rand_body(double max_p, double max_v, double max_m) {
     temp->ay = 0;
     temp->az = 0;
     temp->m = max_m*((double) rand() / (double) RAND_MAX);
-    temp->gmr = 0;
 
     return temp;
 }
@@ -179,18 +178,16 @@ void check_node(node_t* node, body_t* body) {
     double rx = node->cx - body->px;
     double ry = node->cy - body->py;
     double rz = node->cz - body->pz;
-    double r = sqrt(rx*rx + ry*ry + rz*rz + E_SQR);
+    double r = (rx > 0) && (ry > 0) && (rz > 0) ? sqrt(rx*rx + ry*ry + rz*rz + E_SQR) : E;
     double ratio = node->length/r;
 
-    if (r <= E) {}
+    if (r == E) {}
     else if ((ratio < DIST_THRES) | (node->num_child == 0)) {
         double gmr = G*node->tm/(r*r*r);
-        //printf("%d %.9f %.9f %.9f %.9f\n", node_counter, body->ax, gmr*rx, gmr*ry, gmr*rz);
         body->ax += gmr*rx;
         body->ay += gmr*ry;
         body->az += gmr*rz;
-        body->gmr += gmr;
-        node_counter++;
+        //node_counter++;
     }
     else {  // dist > 0 & ratio > THRES & node->num_child > 0
         for (int i = 0; i < node->num_child; i++) {
@@ -276,7 +273,6 @@ void brute(nbodysys_t *nb, int iters, del_t time) {
                     double rz = nb->bodies[j].pz - nb->bodies[i].pz;
                     double r = sqrt(rx*rx + ry*ry + rz*rz + E_SQR);
                     double gmr = G*nb->bodies[j].m/(r*r*r);
-                    nb->bodies[i].gmr += gmr;
                     nb->bodies[i].ax += gmr*rx;
                     nb->bodies[i].ay += gmr*ry;
                     nb->bodies[i].az += gmr*rz;
@@ -324,7 +320,6 @@ void all_seq(nbodysys_t *nb, int iters, del_t time) {
                     double rz = p[j*3+2] - p[z];
                     double r = sqrt(rx*rx + ry*ry + rz*rz + E_SQR);
                     double gmr = gm[j]/(r*r*r);
-                    nb->bodies[i].gmr += gmr;
                     a[x] += gmr*rx;
                     a[y] += gmr*ry;
                     a[z] += gmr*rz;
@@ -363,7 +358,7 @@ void barnes(nbodysys_t *nb, int iters, del_t time) {
     int n = nb->num_bodies;
     node_t *root = init_node(0, 16);
     double max;
-    //omp_set_nested(1);
+    omp_set_nested(1);
 
     for (iter = 0; iter < iters*time; iter += time) {
         max = 0;
@@ -376,7 +371,7 @@ void barnes(nbodysys_t *nb, int iters, del_t time) {
         set_node_members(root, nb->bodies, 0, 0, 0, max*2, nb->num_bodies);
 #pragma omp parallel for
         for (i = 0; i < n; i++) {
-            node_counter = 0;
+            //node_counter = 0;
             check_node(root, &nb->bodies[i]);
             update_p(&nb->bodies[i], time);
             //printf("%d\n", node_counter);

@@ -16,7 +16,6 @@ typedef struct body {
     double vx, vy, vz;
     double ax, ay, az;
     double m;
-    double gmr;
 } body_t;
 
 typedef struct node {
