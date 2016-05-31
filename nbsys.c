@@ -8,7 +8,7 @@
 #define E 0.5*MAX_P
 #define E_SQR E*E // softening factor
 #define DEBUG 2
-#define DIST_THRES 0
+#define DIST_THRES 0.1
 
 // debugging
 static int node_id;
@@ -128,7 +128,6 @@ void set_node_children(node_t *node) {
         }
     }
 
-//#pragma omp parallel for
     for (i = 0; i < node->num_bodies; i++) {
         // derive quadrant q=0..7 from relative position of body to center on each axis
         int b_x = node->bodies[i].px < node->px ? 0 : 1;
@@ -251,10 +250,10 @@ void free_nbodysys(nbodysys_t *nb) {
 }
 
 void print_nbodysys(nbodysys_t *nb) {
+    printf("\n");
     for (int i = 0; i < nb->num_bodies; i++) {
         printf("%.4f\t%.4f\t%.4f\n", nb->bodies[i].px, nb->bodies[i].py, nb->bodies[i].pz);
     }
-    printf("\n");
 }
 
 void brute(nbodysys_t *nb, int iters, del_t time) {

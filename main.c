@@ -108,13 +108,13 @@ int main(int argc, char **argv) {
     }
 
     dstart = omp_get_wtime();
-    all_seq(nb, num_iters, 1.f);
+    brute(nb, num_iters, 1.f);
     dstop = omp_get_wtime();
     if (debug == 1) print_nbodysys(nb);
     printf("%.5f\n", dstop-dstart);
 
     dstart = omp_get_wtime();
-    barnes(nb1, num_iters, 1.f);
+    brute(nb1, num_iters, 1.f);
     dstop = omp_get_wtime();
     if (debug == 1) print_nbodysys(nb1);
     printf("%.5f\n", dstop-dstart);
