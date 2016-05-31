@@ -107,25 +107,23 @@ int main(int argc, char **argv) {
         print_nbodysys(nb);
     }
 
-    /*
     dstart = omp_get_wtime();
     all_seq(nb, num_iters, 1.f);
     dstop = omp_get_wtime();
     if (debug == 1) print_nbodysys(nb);
-    printf("\n%.5f\n", dstop-dstart);
+    printf("%.5f\n", dstop-dstart);
 
     dstart = omp_get_wtime();
-    brute(nb1, num_iters, 1.f);
+    barnes(nb1, num_iters, 1.f);
     dstop = omp_get_wtime();
     if (debug == 1) print_nbodysys(nb1);
-    printf("\n%.5f\n", dstop-dstart);
-    */
+    printf("%.5f\n", dstop-dstart);
 
     dstart = omp_get_wtime();
     barnes(nb2, num_iters, 1.f);
     dstop = omp_get_wtime();
     if (debug == 1) print_nbodysys(nb2);
-    printf("\n%.5f\n", dstop-dstart);
+    printf("%.5f\n", dstop-dstart);
 
     if (debug == 3) {
         double dx = 0;
@@ -133,22 +131,16 @@ int main(int argc, char **argv) {
         double dz = 0;
         int n = nb->num_bodies;
         for (int i = 0; i < n; i++ ) {
-            dx += nb->bodies[i].ax - nb2->bodies[i].ax;
-            dy += nb->bodies[i].ay - nb2->bodies[i].ay;
-            dz += nb->bodies[i].az - nb2->bodies[i].az;
-            //dx += fabs(nb->bodies[i].gmr - nb1->bodies[i].gmr);
-            //dy += fabs(nb->bodies[i].gmr - nb1->bodies[i].gmr);
-            //dz += fabs(nb->bodies[i].gmr - nb1->bodies[i].gmr);
+            dx += fabs(nb->bodies[i].px - nb1->bodies[i].px)/fabs(nb->bodies[i].px);
+            dy += fabs(nb->bodies[i].py - nb1->bodies[i].py)/fabs(nb->bodies[i].py);
+            dz += fabs(nb->bodies[i].pz - nb1->bodies[i].pz)/fabs(nb->bodies[i].pz);
         }
         printf("%.9f %.9f %.9f\n", dx/n, dy/n, dz/n);
         dx = 0; dy = 0; dz = 0;
         for (int i = 0; i < n; i++ ) {
-            dx += nb1->bodies[i].ax - nb2->bodies[i].ax;
-            dy += nb1->bodies[i].ay - nb2->bodies[i].ay;
-            dz += nb1->bodies[i].az - nb2->bodies[i].az;
-            //dx += fabs(nb1->bodies[i].gmr - nb2->bodies[i].gmr);
-            //dy += fabs(nb1->bodies[i].gmr - nb2->bodies[i].gmr);
-            //dz += fabs(nb1->bodies[i].gmr - nb2->bodies[i].gmr);
+            dx += fabs(nb1->bodies[i].px - nb2->bodies[i].px)/fabs(nb->bodies[i].px);
+            dy += fabs(nb1->bodies[i].py - nb2->bodies[i].py)/fabs(nb->bodies[i].py);
+            dz += fabs(nb1->bodies[i].pz - nb2->bodies[i].pz)/fabs(nb->bodies[i].pz);
         }
         printf("%.9f %.9f %.9f\n", dx/n, dy/n, dz/n);
     }

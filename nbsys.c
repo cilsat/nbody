@@ -5,10 +5,10 @@
 #define MAX_P 100
 #define MAX_V 10
 #define MAX_M 100
-#define E 0.1*MAX_P
+#define E 0.5*MAX_P
 #define E_SQR E*E // softening factor
 #define DEBUG 2
-#define DIST_THRES 0.1
+#define DIST_THRES 0
 
 // debugging
 static int node_id;
@@ -128,7 +128,7 @@ void set_node_children(node_t *node) {
         }
     }
 
-#pragma omp parallel for
+//#pragma omp parallel for
     for (i = 0; i < node->num_bodies; i++) {
         // derive quadrant q=0..7 from relative position of body to center on each axis
         int b_x = node->bodies[i].px < node->px ? 0 : 1;
@@ -175,7 +175,7 @@ void check_node(node_t* node, body_t* body) {
     double rx = node->cx - body->px;
     double ry = node->cy - body->py;
     double rz = node->cz - body->pz;
-    double r = (rx > 0) && (ry > 0) && (rz > 0) ? sqrt(rx*rx + ry*ry + rz*rz + E_SQR) : E;
+    double r = (rx != 0) && (ry != 0) && (rz != 0) ? sqrt(rx*rx + ry*ry + rz*rz + E_SQR) : E;
     double ratio = node->length/r;
 
     if (r == E) {}
@@ -252,7 +252,7 @@ void free_nbodysys(nbodysys_t *nb) {
 
 void print_nbodysys(nbodysys_t *nb) {
     for (int i = 0; i < nb->num_bodies; i++) {
-        printf("%.3f\t%.3f\t%.3f\n", nb->bodies[i].px, nb->bodies[i].py, nb->bodies[i].pz);
+        printf("%.4f\t%.4f\t%.4f\n", nb->bodies[i].px, nb->bodies[i].py, nb->bodies[i].pz);
     }
     printf("\n");
 }
@@ -309,7 +309,7 @@ void all_seq(nbodysys_t *nb, int iters, del_t time) {
             int x = i*3;
             int y = i*3+1;
             int z = i*3+2;
-#pragma omp parallel for private(j)
+#pragma omp parallel for
             for (j = 0; j < n; j++) {
                 if (i != j) {
                     double rx = p[j*3] - p[x];
@@ -355,7 +355,7 @@ void barnes(nbodysys_t *nb, int iters, del_t time) {
     int n = nb->num_bodies;
     node_t *root = init_node(0, 16);
     double max;
-    omp_set_nested(1);
+    //omp_set_nested(1);
 
     for (iter = 0; iter < iters*time; iter += time) {
         max = 0;
@@ -371,7 +371,6 @@ void barnes(nbodysys_t *nb, int iters, del_t time) {
             //node_counter = 0;
             check_node(root, &nb->bodies[i]);
             update_p(&nb->bodies[i], time);
-            //printf("%d\n", node_counter);
         }
         if (debug == 2) {
             print_node_members(root);
