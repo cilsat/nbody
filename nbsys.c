@@ -5,10 +5,10 @@
 #define MAX_P 100
 #define MAX_V 10
 #define MAX_M 100
-#define E 0.5*MAX_P
+#define E 0.1*MAX_P
 #define E_SQR E*E // softening factor
 #define DEBUG 2
-#define DIST_THRES 0.15
+#define DIST_THRES 0.1
 
 // debugging
 static int node_id;
@@ -128,7 +128,7 @@ void set_node_children(node_t *node) {
         }
     }
 
-    //#pragma omp parallel for
+#pragma omp parallel for
     for (i = 0; i < node->num_bodies; i++) {
         // derive quadrant q=0..7 from relative position of body to center on each axis
         int b_x = node->bodies[i].px < node->px ? 0 : 1;
@@ -136,13 +136,10 @@ void set_node_children(node_t *node) {
         int b_z = node->bodies[i].pz < node->pz ? 0 : 1;
         int q = b_x*4 + b_y*2 + b_z;
 
-        //#pragma omp critical
-        {
-            // keep track of number of bodies in each quadrant q
-            n_quad[q]++;
-            // keep track of all bodies in each quadrant q
-            c_quad[q][n_quad[q]-1] = i;
-        }
+        // keep track of number of bodies in each quadrant q
+        n_quad[q]++;
+        // keep track of all bodies in each quadrant q
+        c_quad[q][n_quad[q]-1] = i;
     }
 
     for (i = 0; i < 8; i++) {
@@ -201,7 +198,7 @@ void print_node_members(node_t *node) {
         printf("\t");
     }
     if (node->num_child == 0) {
-        printf("%d %d %.3f %.3f %.3f %.3f\n", node->id, node->num_bodies, node->px, node->py, node->pz, node->length);
+        printf("%d %d %.3f %.3f %.3f %.3f\n", node->id, node->num_bodies, node->cx, node->cy, node->cz, node->length);
         for (int i = 0; i < node->num_bodies; i++) {
             for (int j = 0; j < node->depth; j++) {
                 printf("\t");
@@ -209,7 +206,7 @@ void print_node_members(node_t *node) {
             printf("  %.3f %.3f %.3f %.3f\n", node->bodies[i].px, node->bodies[i].py, node->bodies[i].pz, node->tm);
         }
     } else {
-        printf("%d %d %.3f %.3f %.3f %.3f\n", node->id, node->num_bodies, node->px, node->py, node->pz, node->length);
+        printf("%d %d %.3f %.3f %.3f %.3f\n", node->id, node->num_bodies, node->cx, node->cy, node->cz, node->length);
         for (int j = 0; j < node->depth; j++) {
             printf("\t");
         }
