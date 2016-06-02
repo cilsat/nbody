@@ -5,8 +5,8 @@
 #define MAX_P 100
 #define MAX_V 10
 #define MAX_M 100
-#define E 0.5*MAX_P
-#define E_SQR E*E // softening factor
+#define E 50
+#define E_SQR 2500 // softening factor
 #define DEBUG 2
 #define DIST_THRES 0.1
 
@@ -174,20 +174,19 @@ void check_node(node_t* node, body_t* body) {
     double rx = node->cx - body->px;
     double ry = node->cy - body->py;
     double rz = node->cz - body->pz;
-    double r = (rx != 0) && (ry != 0) && (rz != 0) ? sqrt(rx*rx + ry*ry + rz*rz + E_SQR) : E;
-    double ratio = node->length/r;
 
-    if (r == E) {}
-    else if ((ratio < DIST_THRES) | (node->num_child == 0)) {
-        double gmr = G*node->tm/(r*r*r);
-        body->ax += gmr*rx;
-        body->ay += gmr*ry;
-        body->az += gmr*rz;
-        //node_counter++;
-    }
-    else {  // dist > 0 & ratio > THRES & node->num_child > 0
-        for (int i = 0; i < node->num_child; i++) {
-            check_node(&node->child[i], body);
+    if (rx + ry + rz != 0) {
+        double r = sqrt(rx*rx + ry*ry + rz*rz + E_SQR);
+        if ((node->num_child == 0) || (node->length/r < DIST_THRES)) {
+            double gmr = G*node->tm/(r*r*r);
+            body->ax += gmr*rx;
+            body->ay += gmr*ry;
+            body->az += gmr*rz;
+        }
+        else {// r != E | (ratio > DIST_THRES & node->num_child > 0)
+            for (int i = 0; i < node->num_child; i++) {
+                check_node(&node->child[i], body);
+            }
         }
     }
 }
@@ -365,9 +364,9 @@ void barnes(nbodysys_t *nb, int iters, del_t time) {
             max = fabs(nb->bodies[i].pz) > max ? fabs(nb->bodies[i].pz) : max;
         }
         set_node_members(root, nb->bodies, 0, 0, 0, max*2, nb->num_bodies);
+
 #pragma omp parallel for
         for (i = 0; i < n; i++) {
-            //node_counter = 0;
             check_node(root, &nb->bodies[i]);
             update_p(&nb->bodies[i], time);
         }

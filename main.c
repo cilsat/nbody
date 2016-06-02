@@ -107,6 +107,7 @@ int main(int argc, char **argv) {
         print_nbodysys(nb);
     }
 
+    /*
     dstart = omp_get_wtime();
     brute(nb, num_iters, 1.f);
     dstop = omp_get_wtime();
@@ -118,6 +119,7 @@ int main(int argc, char **argv) {
     dstop = omp_get_wtime();
     if (debug == 1) print_nbodysys(nb1);
     printf("%.5f\n", dstop-dstart);
+    */
 
     dstart = omp_get_wtime();
     barnes(nb2, num_iters, 1.f);
