@@ -2,11 +2,11 @@
 #include <assert.h>
 
 #define G 0.1f // universal gravitational constant should be 6.67408e-11
-#define MAX_P 100
-#define MAX_V 10
-#define MAX_M 100
-#define E 50
-#define E_SQR 2500 // softening factor
+#define MAX_P 100.f
+#define MAX_V 10.f
+#define MAX_M 100.f
+#define E 50.f
+#define E_SQR 2500.f // softening factor
 #define DEBUG 2
 #define DIST_THRES 0.1f
 
@@ -15,26 +15,27 @@ static int node_id;
 static int debug;
 //static int node_counter;
 
-float rsqrt(float x) {
+/* carmack method for fast inverse square root (basically newton's method)
+static inline float rsqrt(float x) {
     float hx = 0.5f*x;
     int i = *(int*)&x;
     i = 0x5f3759df - (i>>1);
     x = *(float*)&i;
     x *= (1.5f - hx*x*x);
     return x;
-}
+}*/
 
 body_t *init_rand_body(float max_p, float max_v, float max_m) {
     body_t *temp = (body_t*)malloc(sizeof(body_t));
-    temp->px = max_p*((float)rand() / (float)RAND_MAX) - 0.5*max_p;
-    temp->py = max_p*((float)rand() / (float)RAND_MAX) - 0.5*max_p;
-    temp->pz = max_p*((float)rand() / (float)RAND_MAX) - 0.5*max_p;
-    temp->vx = max_v*((float)rand() / (float)RAND_MAX) - 0.5*max_v;
-    temp->vy = max_v*((float)rand() / (float)RAND_MAX) - 0.5*max_v;
-    temp->vz = max_v*((float)rand() / (float)RAND_MAX) - 0.5*max_v;
-    temp->ax = 0;
-    temp->ay = 0;
-    temp->az = 0;
+    temp->px = max_p*((float)rand() / (float)RAND_MAX) - 0.5f*max_p;
+    temp->py = max_p*((float)rand() / (float)RAND_MAX) - 0.5f*max_p;
+    temp->pz = max_p*((float)rand() / (float)RAND_MAX) - 0.5f*max_p;
+    temp->vx = max_v*((float)rand() / (float)RAND_MAX) - 0.5f*max_v;
+    temp->vy = max_v*((float)rand() / (float)RAND_MAX) - 0.5f*max_v;
+    temp->vz = max_v*((float)rand() / (float)RAND_MAX) - 0.5f*max_v;
+    temp->ax = 0.f;
+    temp->ay = 0.f;
+    temp->az = 0.f;
     temp->m = max_m*((float) rand() / (float) RAND_MAX);
 
     return temp;
@@ -42,6 +43,12 @@ body_t *init_rand_body(float max_p, float max_v, float max_m) {
 
 inline void update_p(body_t* b, del_t t) {
     float ht = 0.5f*t;
+    /*
+    float hmaxp = MAX_P;
+    if ((fabs(b->px) > hmaxp) && (b->vx*b->px > 0.f)) b->vx = -b->vx;
+    if ((fabs(b->py) > hmaxp) && (b->vy*b->py > 0.f)) b->vy = -b->vy;
+    if ((fabs(b->pz) > hmaxp) && (b->vz*b->pz > 0.f)) b->vz = -b->vz;
+    */
     b->vx += b->ax*t;
     b->vy += b->ay*t;
     b->vz += b->az*t;
@@ -54,11 +61,59 @@ void free_body(body_t *body) {
     free(body);
 }
 
-node_t *init_node(int dep, int max_dep) {
+node_t *init_node(int dep, int max_dep, body_t *p_bodies, float p_x, float p_y, float p_z, float p_length, int p_nbodies) {
     node_t *temp = (node_t*)malloc(sizeof(node_t));
     temp->depth = dep;
     temp->max_depth = max_dep;
     temp->id = node_id++;
+    if (p_nbodies > 1) {
+        int i;
+        temp->px = p_x;
+        temp->py = p_y;
+        temp->pz = p_z;
+        temp->length = p_length;
+        temp->num_bodies = p_nbodies;
+        temp->bodies = (body_t*)malloc(p_nbodies*sizeof(body_t));
+        memcpy(temp->bodies, p_bodies, p_nbodies*sizeof(body_t));
+
+        float t_tm = 0.f;
+        float t_cx = 0.f;
+        float t_cy = 0.f;
+        float t_cz = 0.f;
+        for (i = 0; i < p_nbodies; i++) {
+            float t_m = temp->bodies[i].m;
+            t_cx += temp->bodies[i].px*t_m;
+            t_cy += temp->bodies[i].py*t_m;
+            t_cz += temp->bodies[i].pz*t_m;
+            t_tm += t_m;
+        }
+        temp->tm = t_tm;
+        float invtm = 1.f/t_tm;
+        temp->cx = t_cx*invtm;
+        temp->cy = t_cy*invtm;
+        temp->cz = t_cz*invtm;
+
+        temp->num_child = 0;
+        temp->child = 0;
+        if (temp->depth < temp->max_depth) {
+            set_node_children(temp);
+        }
+    }
+    else if (p_nbodies == 1) {
+        temp->px = p_x;
+        temp->py = p_y;
+        temp->pz = p_z;
+        temp->length = p_length;
+        temp->num_bodies = 1;
+        temp->bodies = (body_t*)malloc(sizeof(body_t));
+        memcpy(temp->bodies, &p_bodies[0], sizeof(body_t));
+        temp->cx = temp->bodies[0].px;
+        temp->cy = temp->bodies[0].py;
+        temp->cz = temp->bodies[0].pz;
+        temp->tm = temp->bodies[0].m;
+        temp->num_child = 0;
+        temp->child = 0;
+    }
     return temp;
 }
 
@@ -70,57 +125,6 @@ void free_node(node_t *n) {
         }
     }
     free(n->child);
-}
-
-void set_node_members(node_t *node, body_t *p_bodies, float p_x, float p_y, float p_z, float p_length, int p_nbodies) {
-    if (p_nbodies > 1) {
-        int i;
-        node->px = p_x;
-        node->py = p_y;
-        node->pz = p_z;
-        node->length = p_length;
-        node->num_bodies = p_nbodies;
-        node->bodies = (body_t*)malloc(p_nbodies*sizeof(body_t));
-        memcpy(node->bodies, p_bodies, p_nbodies*sizeof(body_t));
-
-        float t_tm = 0;
-        float t_cx = 0;
-        float t_cy = 0;
-        float t_cz = 0;
-        for (i = 0; i < p_nbodies; i++) {
-            float t_m = node->bodies[i].m;
-            t_cx += node->bodies[i].px*t_m;
-            t_cy += node->bodies[i].py*t_m;
-            t_cz += node->bodies[i].pz*t_m;
-            t_tm += t_m;
-        }
-        node->tm = t_tm;
-        float invtm = 1.f/t_tm;
-        node->cx = t_cx*invtm;
-        node->cy = t_cy*invtm;
-        node->cz = t_cz*invtm;
-
-        node->num_child = 0;
-        node->child = 0;
-        if (node->depth < node->max_depth) {
-            set_node_children(node);
-        }
-    }
-    else if (p_nbodies == 1) {
-        node->px = p_x;
-        node->py = p_y;
-        node->pz = p_z;
-        node->length = p_length;
-        node->num_bodies = 1;
-        node->bodies = (body_t*)malloc(sizeof(body_t));
-        memcpy(node->bodies, &p_bodies[0], sizeof(body_t));
-        node->cx = node->bodies[0].px;
-        node->cy = node->bodies[0].py;
-        node->cz = node->bodies[0].pz;
-        node->tm = node->bodies[0].m;
-        node->num_child = 0;
-        node->child = 0;
-    }
 }
 
 void set_node_children(node_t *node) {
@@ -166,13 +170,11 @@ void set_node_children(node_t *node) {
             float new_py = node->py + m_y*0.25f*node->length;
             float new_pz = node->pz + m_z*0.25f*node->length;
 
-            node_t *t_node = init_node(node->depth+1, node->max_depth);
-            set_node_members(t_node, quad[i], new_px, new_py, new_pz, node->length*0.5, n_quad[i]);
             node->num_child++;
             node->child = (node_t*)realloc(node->child, node->num_child*sizeof(node_t));
-            node->child[node->num_child-1] = *t_node;
-
-            free(t_node);
+            node_t *temp = init_node(node->depth+1, node->max_depth, quad[i], new_px, new_py, new_pz, node->length*0.5f, n_quad[i]);
+            node->child[node->num_child-1] = *temp;
+            free(temp);
         }
         free(quad[i]);
     }
@@ -184,16 +186,16 @@ void check_node(node_t* node, body_t* body) {
     float ry = node->cy - body->py;
     float rz = node->cz - body->pz;
 
-    if (rx + ry + rz != 0) {
-        float r = sqrt(rx*rx + ry*ry + rz*rz + E_SQR);
-        if (node->num_child == 0) {
-            float gmr = G*node->tm/(r*r*r);
+    if (rx+ry+rz != 0.f) {
+        float r = 1.f/sqrtf(rx*rx + ry*ry + rz*rz + E_SQR);
+        if (node->length*r < DIST_THRES) {
+            float gmr = (G*node->tm)*(r*r*r);
             body->ax += gmr*rx;
             body->ay += gmr*ry;
             body->az += gmr*rz;
         }
-        else if (node->length/r < DIST_THRES) {
-            float gmr = G*node->tm/(r*r*r);
+        else if (node->num_child == 0) {
+            float gmr = (G*node->tm)*(r*r*r);
             body->ax += gmr*rx;
             body->ay += gmr*ry;
             body->az += gmr*rz;
@@ -281,8 +283,8 @@ void brute(nbodysys_t *nb, int iters, del_t time) {
                     float rx = nb->bodies[j].px - nb->bodies[i].px;
                     float ry = nb->bodies[j].py - nb->bodies[i].py;
                     float rz = nb->bodies[j].pz - nb->bodies[i].pz;
-                    float r = sqrt(rx*rx + ry*ry + rz*rz + E_SQR);
-                    float gmr = G*nb->bodies[j].m/(r*r*r);
+                    float r = 1.f/sqrtf(rx*rx + ry*ry + rz*rz + E_SQR);
+                    float gmr = (G*nb->bodies[j].m)*(r*r*r);
                     nb->bodies[i].ax += gmr*rx;
                     nb->bodies[i].ay += gmr*ry;
                     nb->bodies[i].az += gmr*rz;
@@ -328,8 +330,8 @@ void all_seq(nbodysys_t *nb, int iters, del_t time) {
                     float rx = p[j*3] - p[x];
                     float ry = p[j*3+1] - p[y];
                     float rz = p[j*3+2] - p[z];
-                    float r = sqrt(rx*rx + ry*ry + rz*rz + E_SQR);
-                    float gmr = gm[j]/(r*r*r);
+                    float r = 1.f/sqrtf(rx*rx + ry*ry + rz*rz + E_SQR);
+                    float gmr = gm[j]*(r*r*r);
                     a[x] += gmr*rx;
                     a[y] += gmr*ry;
                     a[z] += gmr*rz;
@@ -366,18 +368,18 @@ void all_seq(nbodysys_t *nb, int iters, del_t time) {
 void barnes(nbodysys_t *nb, int iters, del_t time) {
     int iter, i;
     int n = nb->num_bodies;
-    node_t *root = init_node(0, 16);
+    //node_t *root = 0;
     float max;
 
     for (iter = 0; iter < iters*time; iter += time) {
-        max = 0;
+        max = 0.f;
         node_id = 1;
         for (i = 0; i < n; i++) {
             max = fabs(nb->bodies[i].px) > max ? fabs(nb->bodies[i].px) : max;
             max = fabs(nb->bodies[i].py) > max ? fabs(nb->bodies[i].py) : max;
             max = fabs(nb->bodies[i].pz) > max ? fabs(nb->bodies[i].pz) : max;
         }
-        set_node_members(root, nb->bodies, 0, 0, 0, max*2, nb->num_bodies);
+        node_t *root = init_node(0, 16, nb->bodies, 0.f, 0.f, 0.f, max*2., nb->num_bodies);
 
 #pragma omp parallel for
         for (i = 0; i < n; i++) {
@@ -388,7 +390,8 @@ void barnes(nbodysys_t *nb, int iters, del_t time) {
             print_node_members(root);
         }
         free_node(root);
+        free(root);
     }
-    free(root);
+    //free(root);
 }
 

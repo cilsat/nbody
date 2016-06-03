@@ -46,9 +46,8 @@ body_t *init_rand_body(float, float, float);
 void update_p(body_t*, del_t);
 
 // node methods
-node_t *init_node(int, int);
+node_t *init_node(int, int, body_t*, float, float, float, float, int);
 void fin_node(node_t*);
-void set_node_members(node_t*, body_t*, float, float, float, float, int);
 void set_node_children(node_t*);
 void print_node_members(node_t*);
 void check_node(node_t*, body_t*);
