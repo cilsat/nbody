@@ -77,11 +77,11 @@ node_t *init_node(int dep, int max_dep, int* p_bodies, int p_nbodies) {
     temp->quad = (int**)malloc(8*sizeof(int*));
     int *quad_data = (int*)malloc(8*p_nbodies*sizeof(int));
     for (int i = 0; i < 8; i++) {
-        temp->quad[i] = &quad_data[i];
-        for (int j = 0; j < p_nbodies; j++) {
-            temp->quad[i][8*j] = 0;
-        }
+        temp->quad[i] = &quad_data[p_nbodies*i];
         temp->num_quad[i] = 0;
+        for (int j = 0; j < p_nbodies; j++) {
+            temp->quad[i][j] = 0;
+        }
     }
 
     return temp;
@@ -127,14 +127,15 @@ void set_node(node_t *node, body_t *np_bodies, float p_x, float p_y, float p_z, 
             for (i = 0; i < n; i++) {
                 // derive quadrant q=0..7 from relative position on each axis
                 // of body to center of current node
-                int b_x = np_bodies[node->bodies[i]].px < node->px ? 0 : 1;
-                int b_y = np_bodies[node->bodies[i]].py < node->py ? 0 : 1;
-                int b_z = np_bodies[node->bodies[i]].pz < node->pz ? 0 : 1;
+                int b = node->bodies[i];
+                int b_x = np_bodies[b].px > node->px;
+                int b_y = np_bodies[b].py > node->py;
+                int b_z = np_bodies[b].pz > node->pz;
                 // each quadrant is mapped to a number between 0..7
                 int q = b_x*4 + b_y*2 + b_z;
 
                 // keep track of all bodies in each quadrant q
-                node->quad[q][node->num_quad[q]] = i;
+                node->quad[q][node->num_quad[q]] = b;
                 // keep track of number of bodies in each quadrant q
                 node->num_quad[q]++;
             }
@@ -212,7 +213,7 @@ void print_node(node_t *node, body_t *np_bodies) {
         printf("\t");
     }
     if (node->num_child == 0) {
-        printf("%d %d %.3f %.3f %.3f %.3f\n", node->id, node->num_bodies, node->cx, node->cy, node->cz, node->length);
+        printf("%d %d %.3f %.3f %.3f %.3f\n", node->id, node->num_bodies, node->px, node->py, node->pz, node->length);
         for (int i = 0; i < node->num_bodies; i++) {
             for (int j = 0; j < node->depth; j++) {
                 printf("\t");
@@ -272,12 +273,23 @@ void print_nbodysys(nbodysys_t *nb) {
 }
 
 void brute(nbodysys_t *nb, int iters, del_t time) {
-    int iter, i, j;
+    int iter, i, j, n;
+    n = nb->num_bodies;
+    /*
+    float **agmr = (float**)malloc(n*sizeof(float*));
+    float *data = (float*)malloc(n*n*sizeof(float));
+    for (i = 0; i < n; i++) {
+        agmr[i] = &data[n*i];
+        for (j = 0; j < n; j++) {
+            agmr[i][j] = 0;
+        }
+    }*/
+
     for (iter = 0; iter < iters*time; iter += time) {
 #pragma omp parallel for private(j)
-        for (i = 0; i < nb->num_bodies; i++) {
+        for (i = 0; i < n; i++) {
 #pragma omp parallel for
-            for (j = 0; j < nb->num_bodies; j++) {
+            for (j = 0; j < n; j++) {
                 if (i != j) {
                     float rx = nb->bodies[j].px - nb->bodies[i].px;
                     float ry = nb->bodies[j].py - nb->bodies[i].py;
