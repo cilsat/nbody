@@ -66,7 +66,23 @@ node_t *init_node(int dep, int max_dep, body_t *p_bodies, float p_x, float p_y, 
     temp->depth = dep;
     temp->max_depth = max_dep;
     temp->id = node_id++;
-    if (p_nbodies > 1) {
+
+    if (p_nbodies == 1) {
+        temp->px = p_x;
+        temp->py = p_y;
+        temp->pz = p_z;
+        temp->length = p_length;
+        temp->num_bodies = 1;
+        temp->bodies = (body_t*)malloc(sizeof(body_t));
+        memcpy(temp->bodies, &p_bodies[0], sizeof(body_t));
+        temp->cx = temp->bodies[0].px;
+        temp->cy = temp->bodies[0].py;
+        temp->cz = temp->bodies[0].pz;
+        temp->tm = temp->bodies[0].m;
+        temp->num_child = 0;
+        temp->child = 0;
+    }
+    else if (p_nbodies > 1) {
         int i;
         temp->px = p_x;
         temp->py = p_y;
@@ -99,21 +115,6 @@ node_t *init_node(int dep, int max_dep, body_t *p_bodies, float p_x, float p_y, 
             set_node_children(temp);
         }
     }
-    else if (p_nbodies == 1) {
-        temp->px = p_x;
-        temp->py = p_y;
-        temp->pz = p_z;
-        temp->length = p_length;
-        temp->num_bodies = 1;
-        temp->bodies = (body_t*)malloc(sizeof(body_t));
-        memcpy(temp->bodies, &p_bodies[0], sizeof(body_t));
-        temp->cx = temp->bodies[0].px;
-        temp->cy = temp->bodies[0].py;
-        temp->cz = temp->bodies[0].pz;
-        temp->tm = temp->bodies[0].m;
-        temp->num_child = 0;
-        temp->child = 0;
-    }
     return temp;
 }
 
@@ -129,7 +130,13 @@ void free_node(node_t *n) {
 
 void set_node_children(node_t *node) {
     int i, j;
+    // container for node bodies (inner dimension) intheir respective quadrants
+    // (outer dimension). quad requires cleaning up afterwards, which prevents
+    // tail recursion!!
     body_t **quad = (body_t**)malloc(8*sizeof(body_t*));
+    // c_quad keeps tracks of which bodies are in which quadrants by index
+    // n_quad keeps track of the number of bodies in each of c_quad's quadrants
+    // c_quad and n_quad are statically defined, hence they clean themselves
     int c_quad[8][node->num_bodies];
     int n_quad[8];
 
@@ -142,27 +149,31 @@ void set_node_children(node_t *node) {
     }
 
     for (i = 0; i < node->num_bodies; i++) {
-        // derive quadrant q=0..7 from relative position of body to center on each axis
+        // derive quadrant q=0..7 from relative position on each axis of body
+        // to center of current node
         int b_x = node->bodies[i].px < node->px ? 0 : 1;
         int b_y = node->bodies[i].py < node->py ? 0 : 1;
         int b_z = node->bodies[i].pz < node->pz ? 0 : 1;
+        // each quadrant is mapped to a number between 0..7
         int q = b_x*4 + b_y*2 + b_z;
 
+        // keep track of all bodies in each quadrant q
+        c_quad[q][n_quad[q]] = i;
         // keep track of number of bodies in each quadrant q
         n_quad[q]++;
-        // keep track of all bodies in each quadrant q
-        c_quad[q][n_quad[q]-1] = i;
     }
 
     for (i = 0; i < 8; i++) {
         if (n_quad[i] > 0) {
-            // make new list(s) of each quadrant and its inhabitants
+            // make new list(s) of each quadrant and populate with its
+            // inhabitants
             quad[i] = (body_t*)realloc(quad[i], (n_quad[i])*sizeof(body_t));
             for (j = 0; j < n_quad[i]; j++) {
                 quad[i][j] = node->bodies[c_quad[i][j]];
             }
 
-            // magic functions to determine new position based on quadrant and length/size of node
+            // magic functions to determine new position based on quadrant and
+            // length/size of node
             int m_x = i/4 == 0 ? -1 : 1;
             int m_y = (i/2)%2 == 0 ? -1 : 1;
             int m_z = i%2 == 0 ? -1 : 1;
@@ -172,15 +183,20 @@ void set_node_children(node_t *node) {
 
             node->num_child++;
             node->child = (node_t*)realloc(node->child, node->num_child*sizeof(node_t));
-            node_t *temp = init_node(node->depth+1, node->max_depth, quad[i], new_px, new_py, new_pz, node->length*0.5f, n_quad[i]);
-            node->child[node->num_child-1] = *temp;
-            free(temp);
+            node->child[node->num_child-1] = *init_node(node->depth+1, node->max_depth, quad[i], new_px, new_py, new_pz, node->length*0.5f, n_quad[i]);
+            //node->child[node->num_child-1] = *temp;
+            //free(temp);
         }
         free(quad[i]);
     }
     free(quad);
 }
 
+/* Recursively checks nodes and decides whether to calculate acceleration based
+ * on given node or to check its children instead. Tail call recursion is
+ * guaranteed with -O2 as long as check_node is called at the end and no lines
+ * follow it. 99.8% of the time is spent in this subroutine.
+ */
 void check_node(node_t* node, body_t* body) {
     float rx = node->cx - body->px;
     float ry = node->cy - body->py;
@@ -188,13 +204,13 @@ void check_node(node_t* node, body_t* body) {
 
     if (rx+ry+rz != 0.f) {
         float r = 1.f/sqrtf(rx*rx + ry*ry + rz*rz + E_SQR);
-        if (node->length*r < DIST_THRES) {
+        if (node->num_child == 0) {
             float gmr = (G*node->tm)*(r*r*r);
             body->ax += gmr*rx;
             body->ay += gmr*ry;
             body->az += gmr*rz;
         }
-        else if (node->num_child == 0) {
+        else if (node->length*r < DIST_THRES) {
             float gmr = (G*node->tm)*(r*r*r);
             body->ax += gmr*rx;
             body->ay += gmr*ry;
@@ -394,4 +410,5 @@ void barnes(nbodysys_t *nb, int iters, del_t time) {
     }
     //free(root);
 }
+
 
