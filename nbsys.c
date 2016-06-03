@@ -8,7 +8,7 @@
 #define E 50.f
 #define E_SQR 2500.f // softening factor
 #define DEBUG 2
-#define DIST_THRES 0.1f
+#define DIST_THRES 0.f
 
 // debugging
 static int node_id;
@@ -75,10 +75,11 @@ node_t *init_node(int dep, int max_dep, int* p_bodies, int p_nbodies) {
     // quad's quadrants.
     temp->num_quad = (int*)malloc(8*sizeof(int));
     temp->quad = (int**)malloc(8*sizeof(int*));
+    int *quad_data = (int*)malloc(8*p_nbodies*sizeof(int));
     for (int i = 0; i < 8; i++) {
-        temp->quad[i] = (int*)malloc(p_nbodies*sizeof(int));
+        temp->quad[i] = &quad_data[i];
         for (int j = 0; j < p_nbodies; j++) {
-            temp->quad[i][j] = 0;
+            temp->quad[i][8*j] = 0;
         }
         temp->num_quad[i] = 0;
     }
@@ -98,12 +99,13 @@ void set_node(node_t *node, body_t *np_bodies, float p_x, float p_y, float p_z, 
     node->child = 0;
 
     if (n == 1) {
+        node->tm = np_bodies[node->bodies[0]].m;
         node->cx = np_bodies[node->bodies[0]].px;
         node->cy = np_bodies[node->bodies[0]].py;
         node->cz = np_bodies[node->bodies[0]].pz;
-        node->tm = np_bodies[node->bodies[0]].m;
     }
     else if (n > 1) {
+        // calculate center of mass for each axis and total mass
         float t_tm = 0.f;
         float t_cx = 0.f;
         float t_cy = 0.f;
@@ -162,9 +164,7 @@ void set_node(node_t *node, body_t *np_bodies, float p_x, float p_y, float p_z, 
 
 void free_node(node_t *n) {
     free(n->bodies);
-    for (int i = 0; i < 8; i++) {
-        free(n->quad[i]);
-    }
+    free(n->quad[0]);
     free(n->quad);
     free(n->num_quad);
     if (n->num_child > 0) {
@@ -173,57 +173,6 @@ void free_node(node_t *n) {
         }
     }
     free(n->child);
-}
-
-void set_node_children(node_t *node, body_t *np_bodies) {
-    int i, j;
-    // c_quad keeps tracks of which bodies are in which quadrants by index
-    // n_quad keeps track of the number of bodies in each of c_quad's quadrants
-    // c_quad and n_quad are statically defined, hence they clean themselves
-    int c_quad[8][node->num_bodies];
-    int n_quad[8];
-
-    for (i = 0; i < 8; i++) {
-        n_quad[i]  = 0;
-        for (j = 0; j < node->num_bodies; j++) {
-            c_quad[i][j] = 0;
-        }
-    }
-
-    for (i = 0; i < node->num_bodies; i++) {
-        // derive quadrant q=0..7 from relative position on each axis of body
-        // to center of current node
-        int b_x = np_bodies[node->bodies[i]].px < node->px ? 0 : 1;
-        int b_y = np_bodies[node->bodies[i]].py < node->py ? 0 : 1;
-        int b_z = np_bodies[node->bodies[i]].pz < node->pz ? 0 : 1;
-        // each quadrant is mapped to a number between 0..7
-        int q = b_x*4 + b_y*2 + b_z;
-
-        // keep track of all bodies in each quadrant q
-        c_quad[q][n_quad[q]] = i;
-        // keep track of number of bodies in each quadrant q
-        n_quad[q]++;
-    }
-
-    for (i = 0; i < 8; i++) {
-        if (n_quad[i] > 0) {
-            // magic functions to determine new position based on quadrant and
-            // length/size of node
-            int m_x = i/4 == 0 ? -1 : 1;
-            int m_y = (i/2)%2 == 0 ? -1 : 1;
-            int m_z = i%2 == 0 ? -1 : 1;
-            float new_px = node->px + m_x*0.25f*node->length;
-            float new_py = node->py + m_y*0.25f*node->length;
-            float new_pz = node->pz + m_z*0.25f*node->length;
-
-            node->num_child++;
-            node->child = (node_t*)realloc(node->child, node->num_child*sizeof(node_t));
-            node_t *new_node = init_node(node->depth+1, node->max_depth, c_quad[i], n_quad[i]);
-            node->child[node->num_child-1] = *new_node;
-            free(new_node);
-            set_node(&node->child[node->num_child-1], np_bodies, new_px, new_py, new_pz, 0.5f*node->length);
-        }
-    }
 }
 
 /* Recursively checks nodes and decides whether to calculate acceleration based
@@ -258,7 +207,7 @@ void check_node(node_t* node, body_t* body) {
     }
 }
 
-void print_node_members(node_t *node, body_t *np_bodies) {
+void print_node(node_t *node, body_t *np_bodies) {
     for (int j = 0; j < node->depth; j++) {
         printf("\t");
     }
@@ -277,7 +226,7 @@ void print_node_members(node_t *node, body_t *np_bodies) {
         }
         printf("%d %.3f %.3f %.3f %.3f\n", node->depth, node->cx, node->cy, node->cz, node->tm);
         for (int i = 0; i < node->num_child; i++) {
-            print_node_members(&node->child[i], np_bodies);
+            print_node(&node->child[i], np_bodies);
         }
     }
 }
@@ -421,6 +370,7 @@ void barnes(nbodysys_t *nb, int iters, del_t time) {
     node_t *root = 0;
     int *root_bodies = (int*)malloc(n*sizeof(int));
     float max;
+    omp_set_nested(1);
 
     for (i = 0; i < n; i++) root_bodies[i] = i;
 
@@ -441,12 +391,11 @@ void barnes(nbodysys_t *nb, int iters, del_t time) {
             update_p(&nb->bodies[i], time);
         }
         if (debug == 2) {
-            print_node_members(root, nb->bodies);
+            print_node(root, nb->bodies);
         }
         free_node(root);
     }
     free(root_bodies);
     free(root);
 }
-
 

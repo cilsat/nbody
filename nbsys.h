@@ -52,15 +52,14 @@ void update_p(body_t*, del_t);
 // node methods
 node_t* init_node(int, int, int*, int);
 void set_node(node_t*, body_t*, float, float, float, float);
-void fin_node(node_t*);
-void set_node_children(node_t*, body_t*);
-void print_node_members(node_t*, body_t*);
+void free_node(node_t*);
 void check_node(node_t*, body_t*);
+void print_node(node_t*, body_t*);
 
 // nbodysys methods
 nbodysys_t *init_rand_bodysys(int, float, float, float);
 nbodysys_t *copy_bodysys(nbodysys_t*);
-void fin_nbodysys(nbodysys_t*);
+void free_nbodysys(nbodysys_t*);
 void print_nbodysys(nbodysys_t*);
 
 // update methods
