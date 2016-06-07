@@ -70,24 +70,12 @@ node_t *init_node(int dep, int max_dep, int* p_bodies, int p_nbodies) {
     temp->bodies = (int*)malloc(p_nbodies*sizeof(int));
     memcpy(temp->bodies, p_bodies, p_nbodies*sizeof(int));
 
-    // quad keeps tracks of which bodies are in which quadrants by
-    // index. num_quad keeps track of the number of bodies in each of
-    // quad's quadrants.
-    temp->num_quad = (int*)malloc(8*sizeof(int));
-    temp->quad = (int**)malloc(8*sizeof(int*));
-    int *quad_data = (int*)malloc(8*p_nbodies*sizeof(int));
-    for (int i = 0; i < 8; i++) {
-        temp->quad[i] = &quad_data[p_nbodies*i];
-        temp->num_quad[i] = 0;
-        for (int j = 0; j < p_nbodies; j++) {
-            temp->quad[i][j] = 0;
-        }
-    }
+    memset(&temp->child, 0, sizeof(temp->child));
 
     return temp;
 }
 
-// recursively divide bodies into quadrants and create new child nodes from 
+// recursively divide bodies into quadrants and create new child nodes from
 // each of these quadrants. stops when maximum node depth is reached or when
 // exactly one body is found in quadrant. quadrants with no bodies are not
 // initialized as nodes.
@@ -100,7 +88,6 @@ void set_node(node_t *node, body_t *np_bodies, float p_x, float p_y, float p_z, 
     node->pz = p_z;
     node->length = p_length;
     node->num_child = 0;
-    node->child = 0;
 
     if (n == 1) {
         node->tm = np_bodies[node->bodies[0]].m;
@@ -128,6 +115,19 @@ void set_node(node_t *node, body_t *np_bodies, float p_x, float p_y, float p_z, 
         node->cz = t_cz*invtm;
 
         if (node->depth < node->max_depth) {
+            // quad keeps tracks of which bodies are in which quadrants by
+            // index. num_quad keeps track of the number of bodies in each
+            // of quad's quadrants.
+            node->num_quad = (int*)malloc(8*sizeof(int));
+            node->quad = (int**)malloc(8*sizeof(int*));
+            int *quad_data = (int*)malloc(8*n*sizeof(int));
+            for (int i = 0; i < 8; i++) {
+                node->quad[i] = &quad_data[n*i];
+                node->num_quad[i] = 0;
+                for (int j = 0; j < n; j++) {
+                    node->quad[i][j] = 0;
+                }
+            }
             for (i = 0; i < n; i++) {
                 // derive quadrant q=0..7 from relative position on each axis
                 // of body to center of current node
@@ -147,8 +147,8 @@ void set_node(node_t *node, body_t *np_bodies, float p_x, float p_y, float p_z, 
             for (i = 0; i < 8; i++) {
                 if (node->num_quad[i] > 0) {
                     // dynamically add child
+#pragma omp atomic
                     node->num_child++;
-                    node->child = (node_t*)realloc(node->child, node->num_child*sizeof(node_t));
                     // magic functions to determine new position based on
                     // quadrant and length/size of node
                     int m_x = i/4 == 0 ? -1 : 1;
@@ -160,12 +160,10 @@ void set_node(node_t *node, body_t *np_bodies, float p_x, float p_y, float p_z, 
                     // initialize new node and push into child array
                     // init_node is separated from set_node specifically so that
                     // the pointer can be freed before the recursive call
-                    node_t *new_node = init_node(node->depth+1, node->max_depth, node->quad[i], node->num_quad[i]);
-                    node->child[node->num_child-1] = *new_node;
-                    free(new_node);
+                    node->child[i] = init_node(node->depth+1, node->max_depth, node->quad[i], node->num_quad[i]);
                     // the recursive call *MUST BE PLACED LAST* to ensure the
                     // tail call optimization
-                    set_node(&node->child[node->num_child-1], np_bodies, new_px, new_py, new_pz, 0.5f*node->length);
+                    set_node(node->child[i], np_bodies, new_px, new_py, new_pz, 0.5f*node->length);
                 }
             }
         }
@@ -175,21 +173,24 @@ void set_node(node_t *node, body_t *np_bodies, float p_x, float p_y, float p_z, 
 // recursively free nodes
 void free_node(node_t *n) {
     free(n->bodies);
-    free(n->quad[0]);
-    free(n->quad);
-    free(n->num_quad);
-    if (n->num_child > 0) {
-        for (int i = 0; i < n->num_child; i++) {
-            free_node(&n->child[i]);
+    if (n->num_child > 1) {
+        free(n->quad[0]);
+        free(n->quad);
+        free(n->num_quad);
+#pragma omp parallel for
+        for (int i = 0; i < 8; i++) {
+            if (n->child[i] != 0) {
+                free_node(n->child[i]);
+                free(n->child[i]);
+            }
         }
     }
-    free(n->child);
 }
 
 /* Recursively checks nodes and decides whether to calculate acceleration based
  * on given node or to check its children instead. Tail call recursion is
  * guaranteed with -O2 as long as check_node is called at the end and no lines
- * follow it. 99.8% of the time is spent in this subroutine.
+ * follow it. >90% of the time is spent in this subroutine.
  */
 void check_node(node_t* node, body_t* body) {
     float rx = node->cx - body->px;
@@ -211,8 +212,9 @@ void check_node(node_t* node, body_t* body) {
             body->az += gmr*rz;
         }
         else {// r != E | (ratio > DIST_THRES & node->num_child > 0)
-            for (int i = 0; i < node->num_child; i++) {
-                check_node(&node->child[i], body);
+            for (int i = 0; i < 8; i++) {
+                if (node->child[i] != 0)
+                    check_node(node->child[i], body);
             }
         }
     }
@@ -236,8 +238,9 @@ void print_node(node_t *node, body_t *np_bodies) {
             printf("\t");
         }
         printf("%d %.3f %.3f %.3f %.3f\n", node->depth, node->cx, node->cy, node->cz, node->tm);
-        for (int i = 0; i < node->num_child; i++) {
-            print_node(&node->child[i], np_bodies);
+        for (int i = 0; i < 8; i++) {
+            if (node->child[i] != 0)
+                print_node(node->child[i], np_bodies);
         }
     }
 }
@@ -382,7 +385,7 @@ void barnes(nbodysys_t *nb, int iters, del_t time) {
     node_t *root = 0;
     int *root_bodies = (int*)malloc(n*sizeof(int));
     float max;
-    omp_set_nested(1);
+    //omp_set_nested(1);
 
     for (i = 0; i < n; i++) root_bodies[i] = i;
 

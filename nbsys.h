@@ -32,7 +32,7 @@ typedef struct node {
     int **quad;
     int *num_quad;
 
-    struct node *child;
+    struct node *child[8];
     int num_child;
 } node_t;
 
