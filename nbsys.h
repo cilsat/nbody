@@ -9,7 +9,6 @@
 #include <omp.h>
 
 typedef float del_t;
-typedef float dist_t;
 
 typedef struct body {
     float px, py, pz;

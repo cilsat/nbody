@@ -116,13 +116,11 @@ int main(int argc, char **argv) {
     }
 
     if ((debug == 3) || (debug == 1)) {
-        /*
         dstart = omp_get_wtime();
         all_seq(nb, num_iters, 1.f);
         dstop = omp_get_wtime();
         if (debug == 1) print_nbodysys(nb);
         printf("%.5f\n", dstop-dstart);
-        */
 
         dstart = omp_get_wtime();
         brute(nb1, num_iters, 1.f);
@@ -142,7 +140,6 @@ int main(int argc, char **argv) {
         float dy = 0;
         float dz = 0;
         int n = nb->num_bodies;
-        /*
         for (int i = 0; i < n; i++ ) {
             dx += err(nb->bodies[i].px, nb1->bodies[i].px);
             dy += err(nb->bodies[i].py, nb1->bodies[i].py);
@@ -150,7 +147,6 @@ int main(int argc, char **argv) {
         }
         printf("%.9f %.9f %.9f\n", dx/n, dy/n, dz/n);
         dx = 0; dy = 0; dz = 0;
-        */
         for (int i = 0; i < n; i++ ) {
             dx += err(nb1->bodies[i].px, nb2->bodies[i].px);
             dy += err(nb1->bodies[i].py, nb2->bodies[i].py);

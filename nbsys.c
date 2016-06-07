@@ -8,14 +8,14 @@
 #define E 50.f
 #define E_SQR 2500.f // softening factor
 #define DEBUG 2
-#define DIST_THRES 0.f
+#define DIST_THRES 0.25f
 
 // debugging
 static int node_id;
 static int debug;
 //static int node_counter;
 
-/* carmack method for fast inverse square root (basically newton's method)
+// carmack method for fast inverse square root (basically newton's method)
 static inline float rsqrt(float x) {
     float hx = 0.5f*x;
     int i = *(int*)&x;
@@ -23,16 +23,18 @@ static inline float rsqrt(float x) {
     x = *(float*)&i;
     x *= (1.5f - hx*x*x);
     return x;
-}*/
+}
 
+// initialize a random body, specifying the maximum values for each attribute,
+// and returning a pointer to it.
 body_t *init_rand_body(float max_p, float max_v, float max_m) {
     body_t *temp = (body_t*)malloc(sizeof(body_t));
-    temp->px = max_p*((float)rand() / (float)RAND_MAX) - 0.5f*max_p;
-    temp->py = max_p*((float)rand() / (float)RAND_MAX) - 0.5f*max_p;
-    temp->pz = max_p*((float)rand() / (float)RAND_MAX) - 0.5f*max_p;
-    temp->vx = max_v*((float)rand() / (float)RAND_MAX) - 0.5f*max_v;
-    temp->vy = max_v*((float)rand() / (float)RAND_MAX) - 0.5f*max_v;
-    temp->vz = max_v*((float)rand() / (float)RAND_MAX) - 0.5f*max_v;
+    temp->px = max_p*(((float)rand() / (float)RAND_MAX) - 0.5f);
+    temp->py = max_p*(((float)rand() / (float)RAND_MAX) - 0.5f);
+    temp->pz = max_p*(((float)rand() / (float)RAND_MAX) - 0.5f);
+    temp->vx = max_v*(((float)rand() / (float)RAND_MAX) - 0.5f);
+    temp->vy = max_v*(((float)rand() / (float)RAND_MAX) - 0.5f);
+    temp->vz = max_v*(((float)rand() / (float)RAND_MAX) - 0.5f);
     temp->ax = 0.f;
     temp->ay = 0.f;
     temp->az = 0.f;
@@ -41,14 +43,9 @@ body_t *init_rand_body(float max_p, float max_v, float max_m) {
     return temp;
 }
 
+// updates the velocity and position of a body from its acceleration.
 inline void update_p(body_t* b, del_t t) {
     float ht = 0.5f*t;
-    /*
-    float hmaxp = MAX_P;
-    if ((fabs(b->px) > hmaxp) && (b->vx*b->px > 0.f)) b->vx = -b->vx;
-    if ((fabs(b->py) > hmaxp) && (b->vy*b->py > 0.f)) b->vy = -b->vy;
-    if ((fabs(b->pz) > hmaxp) && (b->vz*b->pz > 0.f)) b->vz = -b->vz;
-    */
     b->vx += b->ax*t;
     b->vy += b->ay*t;
     b->vz += b->az*t;
@@ -61,6 +58,9 @@ void free_body(body_t *body) {
     free(body);
 }
 
+// function that initializes a node and returns a pointer to it. this function
+// is kept separate from the recursive call to ensure the pointer can be freed
+// before the call takes place.
 node_t *init_node(int dep, int max_dep, int* p_bodies, int p_nbodies) {
     node_t *temp = (node_t*)malloc(sizeof(node_t));
     temp->depth = dep;
@@ -87,6 +87,10 @@ node_t *init_node(int dep, int max_dep, int* p_bodies, int p_nbodies) {
     return temp;
 }
 
+// recursively divide bodies into quadrants and create new child nodes from 
+// each of these quadrants. stops when maximum node depth is reached or when
+// exactly one body is found in quadrant. quadrants with no bodies are not
+// initialized as nodes.
 void set_node(node_t *node, body_t *np_bodies, float p_x, float p_y, float p_z, float p_length) {
     int i;
     int n = node->num_bodies;
@@ -139,9 +143,12 @@ void set_node(node_t *node, body_t *np_bodies, float p_x, float p_y, float p_z, 
                 // keep track of number of bodies in each quadrant q
                 node->num_quad[q]++;
             }
-
+#pragma omp parallel for
             for (i = 0; i < 8; i++) {
                 if (node->num_quad[i] > 0) {
+                    // dynamically add child
+                    node->num_child++;
+                    node->child = (node_t*)realloc(node->child, node->num_child*sizeof(node_t));
                     // magic functions to determine new position based on
                     // quadrant and length/size of node
                     int m_x = i/4 == 0 ? -1 : 1;
@@ -150,12 +157,14 @@ void set_node(node_t *node, body_t *np_bodies, float p_x, float p_y, float p_z, 
                     float new_px = node->px + m_x*0.25f*node->length;
                     float new_py = node->py + m_y*0.25f*node->length;
                     float new_pz = node->pz + m_z*0.25f*node->length;
-
-                    node->num_child++;
-                    node->child = (node_t*)realloc(node->child, node->num_child*sizeof(node_t));
+                    // initialize new node and push into child array
+                    // init_node is separated from set_node specifically so that
+                    // the pointer can be freed before the recursive call
                     node_t *new_node = init_node(node->depth+1, node->max_depth, node->quad[i], node->num_quad[i]);
                     node->child[node->num_child-1] = *new_node;
                     free(new_node);
+                    // the recursive call *MUST BE PLACED LAST* to ensure the
+                    // tail call optimization
                     set_node(&node->child[node->num_child-1], np_bodies, new_px, new_py, new_pz, 0.5f*node->length);
                 }
             }
@@ -163,6 +172,7 @@ void set_node(node_t *node, body_t *np_bodies, float p_x, float p_y, float p_z, 
     }
 }
 
+// recursively free nodes
 void free_node(node_t *n) {
     free(n->bodies);
     free(n->quad[0]);
@@ -275,16 +285,6 @@ void print_nbodysys(nbodysys_t *nb) {
 void brute(nbodysys_t *nb, int iters, del_t time) {
     int iter, i, j, n;
     n = nb->num_bodies;
-    /*
-    float **agmr = (float**)malloc(n*sizeof(float*));
-    float *data = (float*)malloc(n*n*sizeof(float));
-    for (i = 0; i < n; i++) {
-        agmr[i] = &data[n*i];
-        for (j = 0; j < n; j++) {
-            agmr[i][j] = 0;
-        }
-    }*/
-
     for (iter = 0; iter < iters*time; iter += time) {
 #pragma omp parallel for private(j)
         for (i = 0; i < n; i++) {
