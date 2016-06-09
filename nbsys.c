@@ -253,9 +253,12 @@ nbodysys_t *init_rand_nbodysys(int n, float max_p, float max_v, float max_m) {
 
 nbodysys_t *copy_bodysys(nbodysys_t *src) {
     int n = src->num_bodies;
-    nbodysys_t *dest = init_rand_nbodysys(n, src->maxp, src->maxv, src->maxm);
-
-    dest->bodies = (body_t*)realloc(dest->bodies, n*sizeof(body_t));
+    nbodysys_t *dest = (nbodysys_t*)malloc(sizeof(nbodysys_t));
+    dest->num_bodies = n;
+    dest->maxp = src->maxp;
+    dest->maxv = src->maxv;
+    dest->maxm = src->maxm;
+    dest->bodies = (body_t*)malloc(n*sizeof(body_t));
     memcpy(dest->bodies, src->bodies, n*sizeof(body_t));
 
     return dest;
