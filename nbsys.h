@@ -29,8 +29,8 @@ typedef struct node {
     int *bodies;
     int num_bodies;
 
-    int **quad;
-    int *num_quad;
+    int *quad[8];
+    int num_quad[8];
 
     struct node *child[8];
     int num_child;
@@ -49,8 +49,7 @@ body_t *init_rand_body(float, float, float);
 void update_p(body_t*, del_t);
 
 // node methods
-node_t* init_node(int, int, int*, int);
-void set_node(node_t*, body_t*, float, float, float, float);
+void init_node(node_t*, int, int, body_t*, int*, int, float, float, float, float);
 void free_node(node_t*);
 void check_node(node_t*, body_t*);
 void print_node(node_t*, body_t*);
