@@ -99,62 +99,59 @@ void init_node(node_t *node, int dep, int max_dep, body_t *np_bodies, int* p_bod
         float t_cx = 0.f;
         float t_cy = 0.f;
         float t_cz = 0.f;
+        // quad keeps tracks of which bodies are in which quadrants by
+        // index. num_quad keeps track of the number of bodies in each
+        // of quad's quadrants.
+        int *quad_data = (int*)malloc(8*n*sizeof(int));
+        for (int i = 0; i < 8; i++) {
+            node->quad[i] = &quad_data[n*i];
+        }
         for (i = 0; i < n; i++) {
-            float t_m = np_bodies[node->bodies[i]].m;
-            t_cx += np_bodies[node->bodies[i]].px*t_m;
-            t_cy += np_bodies[node->bodies[i]].py*t_m;
-            t_cz += np_bodies[node->bodies[i]].pz*t_m;
+            int b = node->bodies[i];
+
+            float t_m = np_bodies[b].m;
+            t_cx += np_bodies[b].px*t_m;
+            t_cy += np_bodies[b].py*t_m;
+            t_cz += np_bodies[b].pz*t_m;
             t_tm += t_m;
+
+            // derive quadrant q=0..7 from relative position on each axis
+            // of body to center of current node
+            int b_x = np_bodies[b].px > node->px;
+            int b_y = np_bodies[b].py > node->py;
+            int b_z = np_bodies[b].pz > node->pz;
+            // each quadrant is mapped to a number between 0..7
+            int q = b_x*4 + b_y*2 + b_z;
+
+            // keep track of all bodies in each quadrant q
+            node->quad[q][node->num_quad[q]] = b;
+            // keep track of number of bodies in each quadrant q
+            node->num_quad[q]++;
         }
         node->tm = t_tm;
         float invtm = 1.f/t_tm;
         node->cx = t_cx*invtm;
         node->cy = t_cy*invtm;
         node->cz = t_cz*invtm;
-
-        if (node->depth < node->max_depth) {
-            // quad keeps tracks of which bodies are in which quadrants by
-            // index. num_quad keeps track of the number of bodies in each
-            // of quad's quadrants.
-            int *quad_data = (int*)malloc(8*n*sizeof(int));
-            for (int i = 0; i < 8; i++) {
-                node->quad[i] = &quad_data[n*i];
-            }
-            for (i = 0; i < n; i++) {
-                // derive quadrant q=0..7 from relative position on each axis
-                // of body to center of current node
-                int b = node->bodies[i];
-                int b_x = np_bodies[b].px > node->px;
-                int b_y = np_bodies[b].py > node->py;
-                int b_z = np_bodies[b].pz > node->pz;
-                // each quadrant is mapped to a number between 0..7
-                int q = b_x*4 + b_y*2 + b_z;
-
-                // keep track of all bodies in each quadrant q
-                node->quad[q][node->num_quad[q]] = b;
-                // keep track of number of bodies in each quadrant q
-                node->num_quad[q]++;
-            }
 #pragma omp parallel for
-            for (i = 0; i < 8; i++) {
-                if (node->num_quad[i] > 0) {
-                    // dynamically add child
+        for (i = 0; i < 8; i++) {
+            if (node->num_quad[i] > 0) {
+                // dynamically add child
 #pragma omp atomic
-                    node->num_child++;
-                    // magic functions to determine new position based on
-                    // quadrant and length/size of node
-                    int m_x = i/4 == 0 ? -1 : 1;
-                    int m_y = (i/2)%2 == 0 ? -1 : 1;
-                    int m_z = i%2 == 0 ? -1 : 1;
-                    float new_px = node->px + m_x*0.25f*node->length;
-                    float new_py = node->py + m_y*0.25f*node->length;
-                    float new_pz = node->pz + m_z*0.25f*node->length;
-                    // initialize new node and push into child array
-                    // the recursive call *MUST BE PLACED LAST* to ensure the
-                    // tail call optimization
-                    node->child[i] = (node_t*)malloc(sizeof(node_t));
-                    init_node(node->child[i], node->depth+1, node->max_depth, np_bodies, node->quad[i], node->num_quad[i], new_px, new_py, new_pz, 0.5f*node->length);
-                }
+                node->num_child++;
+                // magic functions to determine new position based on
+                // quadrant and length/size of node
+                int m_x = i/4 == 0 ? -1 : 1;
+                int m_y = (i/2)%2 == 0 ? -1 : 1;
+                int m_z = i%2 == 0 ? -1 : 1;
+                float new_px = node->px + m_x*0.25f*node->length;
+                float new_py = node->py + m_y*0.25f*node->length;
+                float new_pz = node->pz + m_z*0.25f*node->length;
+                // initialize new node and push into child array
+                // the recursive call *MUST BE PLACED LAST* to ensure the
+                // tail call optimization
+                node->child[i] = (node_t*)malloc(sizeof(node_t));
+                init_node(node->child[i], node->depth+1, node->max_depth, np_bodies, node->quad[i], node->num_quad[i], new_px, new_py, new_pz, 0.5f*node->length);
             }
         }
     }
@@ -184,20 +181,20 @@ void check_node(node_t* node, body_t* body) {
     float rx = node->cx - body->px;
     float ry = node->cy - body->py;
     float rz = node->cz - body->pz;
-
-    if (rx+ry+rz != 0.f) {
-        float r = 1.f/sqrtf(rx*rx + ry*ry + rz*rz + E_SQR);
-        if (node->num_child == 0 || node->length*r < DIST_THRES) {
-            float gmr = (G*node->tm)*(r*r*r);
-            body->ax += gmr*rx;
-            body->ay += gmr*ry;
-            body->az += gmr*rz;
-        }
-        else {// r != E | (ratio > DIST_THRES & node->num_child > 0)
+    float r = rx*rx + ry*ry + rz*rz;
+    if (r > 0.f) {
+        r = 1.f/sqrtf(r + E_SQR);
+        if (node->length*r > DIST_THRES && node->num_child != 0) {
             for (int i = 0; i < 8; i++) {
                 if (node->child[i] != 0)
                     check_node(node->child[i], body);
             }
+        }
+        else {// r != E | (ratio > DIST_THRES & node->num_child > 0)
+            float gmr = G*node->tm*r*r*r;
+            body->ax += gmr*rx;
+            body->ay += gmr*ry;
+            body->az += gmr*rz;
         }
     }
 }
