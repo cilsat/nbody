@@ -187,13 +187,7 @@ void check_node(node_t* node, body_t* body) {
 
     if (rx+ry+rz != 0.f) {
         float r = 1.f/sqrtf(rx*rx + ry*ry + rz*rz + E_SQR);
-        if (node->num_child == 0) {
-            float gmr = (G*node->tm)*(r*r*r);
-            body->ax += gmr*rx;
-            body->ay += gmr*ry;
-            body->az += gmr*rz;
-        }
-        else if (node->length*r < DIST_THRES) {
+        if (node->num_child == 0 || node->length*r < DIST_THRES) {
             float gmr = (G*node->tm)*(r*r*r);
             body->ax += gmr*rx;
             body->ay += gmr*ry;
