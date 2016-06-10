@@ -141,16 +141,16 @@ int main(int argc, char **argv) {
         float dz = 0;
         int n = nb->num_bodies;
         for (int i = 0; i < n; i++ ) {
-            dx += err(nb->bodies[i].px, nb1->bodies[i].px);
-            dy += err(nb->bodies[i].py, nb1->bodies[i].py);
-            dz += err(nb->bodies[i].pz, nb1->bodies[i].pz);
+            dx += err(nb->bodies[i].ax, nb1->bodies[i].ax);
+            dy += err(nb->bodies[i].ay, nb1->bodies[i].ay);
+            dz += err(nb->bodies[i].az, nb1->bodies[i].az);
         }
         printf("%.9f %.9f %.9f\n", dx/n, dy/n, dz/n);
         dx = 0; dy = 0; dz = 0;
         for (int i = 0; i < n; i++ ) {
-            dx += err(nb1->bodies[i].px, nb2->bodies[i].px);
-            dy += err(nb1->bodies[i].py, nb2->bodies[i].py);
-            dz += err(nb1->bodies[i].pz, nb2->bodies[i].pz);
+            dx += err(nb1->bodies[i].ax, nb2->bodies[i].ax);
+            dy += err(nb1->bodies[i].ay, nb2->bodies[i].ay);
+            dz += err(nb1->bodies[i].az, nb2->bodies[i].az);
         }
         printf("%.9f %.9f %.9f\n", dx/n, dy/n, dz/n);
     }
