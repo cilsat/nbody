@@ -300,6 +300,76 @@ void brute(nbodysys_t *nb, int iters, del_t time) {
     }
 }
 
+void all_seq(nbodysys_t *nb, int iters, del_t time) {
+    int n = nb->num_bodies;
+    int iter, i, j;
+    float ht = 0.5f*time;
+    float *p = (float*)malloc(n*3*sizeof(float));
+    float *v = (float*)malloc(n*3*sizeof(float));
+    float *a = (float*)malloc(n*3*sizeof(float));
+    float *gm = (float*)malloc(n*sizeof(float));
+
+    for (i = 0; i < nb->num_bodies; i++) {
+        int in = i*3;
+        p[in] = nb->bodies[i].px;
+        p[in+1] = nb->bodies[i].py;
+        p[in+2] = nb->bodies[i].pz;
+        v[in] = nb->bodies[i].vx;
+        v[in+1] = nb->bodies[i].vy;
+        v[in+2] = nb->bodies[i].vz;
+        a[in] = nb->bodies[i].ax;
+        a[in+1] = nb->bodies[i].ay;
+        a[in+2] = nb->bodies[i].az;
+        gm[i] = G*nb->bodies[i].m;
+    }
+
+    for (iter = 0; iter < iters*time; iter += time) {
+#pragma omp parallel for private(j)
+        for (i = 0; i < n; i++) {
+            int x = i*3;
+            int y = i*3+1;
+            int z = i*3+2;
+#pragma omp parallel for
+            for (j = 0; j < n; j++) {
+                if (i != j) {
+                    float rx = p[j*3] - p[x];
+                    float ry = p[j*3+1] - p[y];
+                    float rz = p[j*3+2] - p[z];
+                    float r = 1.f/sqrtf(rx*rx + ry*ry + rz*rz + E_SQR);
+                    float gmr = gm[j]*(r*r*r);
+                    a[x] += gmr*rx;
+                    a[y] += gmr*ry;
+                    a[z] += gmr*rz;
+                }
+            }
+            v[x] += a[x]*time;
+            v[y] += a[y]*time;
+            v[z] += a[z]*time;
+            p[x] += v[x]*ht;
+            p[y] += v[y]*ht;
+            p[z] += v[z]*ht;
+        }
+    }
+
+    for (i = 0; i < n; i++) {
+        int in = i*3;
+        nb->bodies[i].px = p[in];
+        nb->bodies[i].py = p[in+1];
+        nb->bodies[i].pz = p[in+2];
+        nb->bodies[i].vx = v[in];
+        nb->bodies[i].vy = v[in+1];
+        nb->bodies[i].vz = v[in+2];
+        nb->bodies[i].ax = a[in];
+        nb->bodies[i].ay = a[in+1];
+        nb->bodies[i].az = a[in+2];
+    }
+
+    free(p);
+    free(v);
+    free(a);
+    free(gm);
+}
+
 void barnes(nbodysys_t *nb, int iters, del_t time) {
     int iter, i;
     int n = nb->num_bodies;
