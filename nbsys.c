@@ -187,7 +187,7 @@ void check_node(node_t* node, body_t* body) {
             }
         }
         else {// r != E | (ratio > DIST_THRES & node->num_child > 0)
-            float gmr = G*node->tm*r*r*r;
+            float gmr = G*node->tm*(r*r*r);
             body->ax += gmr*rx;
             body->ay += gmr*ry;
             body->az += gmr*rz;
