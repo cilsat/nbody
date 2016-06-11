@@ -46,7 +46,7 @@ typedef void (*update) (nbodysys_t *nb, int iters, del_t time);
 
 // body methods
 body_t *init_rand_body(float, float, float);
-void update_p(body_t*, del_t);
+void update_body(body_t*, del_t);
 
 // node methods
 void init_node(node_t*, int, int, body_t*, int*, int, float, float, float, float);
@@ -56,13 +56,12 @@ void print_node(node_t*, body_t*);
 
 // nbodysys methods
 nbodysys_t *init_rand_bodysys(int, float, float, float);
-nbodysys_t *copy_bodysys(nbodysys_t*);
+nbodysys_t *copy_nbodysys(nbodysys_t*);
 void free_nbodysys(nbodysys_t*);
 void print_nbodysys(nbodysys_t*);
 
 // update methods
 void brute(nbodysys_t*, int iter, del_t);
-void all_seq(nbodysys_t*, int iter, del_t);
 void barnes(nbodysys_t*, int iter, del_t);
 
 #endif

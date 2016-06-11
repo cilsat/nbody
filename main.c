@@ -108,8 +108,8 @@ int main(int argc, char **argv) {
     }
 
     //nbodysys_t *nb1 = init_rand_nbodysys(num_bodies, maxp, maxv, maxm);
-    nbodysys_t *nb1 = copy_bodysys(nb);
-    nbodysys_t *nb2 = copy_bodysys(nb);
+    nbodysys_t *nb1 = copy_nbodysys(nb);
+    nbodysys_t *nb2 = copy_nbodysys(nb);
     
     if (debug == 1) {
         print_nbodysys(nb);

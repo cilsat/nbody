@@ -44,7 +44,7 @@ body_t *init_rand_body(float max_p, float max_v, float max_m) {
 }
 
 // updates the velocity and position of a body from its acceleration.
-inline void update_p(body_t* b, del_t t) {
+inline void update_body(body_t* b, del_t t) {
     float ht = 0.5f*t;
     b->vx += b->ax*t;
     b->vy += b->ay*t;
@@ -52,10 +52,6 @@ inline void update_p(body_t* b, del_t t) {
     b->px += b->vx*ht;
     b->py += b->vy*ht;
     b->pz += b->vz*ht;
-}
-
-void free_body(body_t *body) {
-    free(body);
 }
 
 // function that initializes a node and returns a pointer to it. this function
@@ -242,7 +238,7 @@ nbodysys_t *init_rand_nbodysys(int n, float max_p, float max_v, float max_m) {
     return temp;
 }
 
-nbodysys_t *copy_bodysys(nbodysys_t *src) {
+nbodysys_t *copy_nbodysys(nbodysys_t *src) {
     int n = src->num_bodies;
     nbodysys_t *dest = (nbodysys_t*)malloc(sizeof(nbodysys_t));
     dest->num_bodies = n;
@@ -280,13 +276,13 @@ void brute(nbodysys_t *nb, int iters, del_t time) {
                     float ry = nb->bodies[j].py - nb->bodies[i].py;
                     float rz = nb->bodies[j].pz - nb->bodies[i].pz;
                     float r = 1.f/sqrtf(rx*rx + ry*ry + rz*rz + E_SQR);
-                    float gmr = (G*nb->bodies[j].m)*(r*r*r);
+                    float gmr = G*nb->bodies[j].m*r*r*r;
                     nb->bodies[i].ax += gmr*rx;
                     nb->bodies[i].ay += gmr*ry;
                     nb->bodies[i].az += gmr*rz;
                 }
             }
-            update_p(&nb->bodies[i], time);
+            update_body(&nb->bodies[i], time);
         }
     }
 }
@@ -315,7 +311,7 @@ void barnes(nbodysys_t *nb, int iters, del_t time) {
 #pragma omp parallel for
         for (i = 0; i < n; i++) {
             check_node(root, &nb->bodies[i]);
-            update_p(&nb->bodies[i], time);
+            update_body(&nb->bodies[i], time);
         }
         if (debug == 2) {
             print_node(root, nb->bodies);
