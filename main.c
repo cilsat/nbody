@@ -107,26 +107,44 @@ int main(int argc, char **argv) {
         read_file(nb, filename);
     }
 
-    //nbodysys_t *nb1 = init_rand_nbodysys(num_bodies, maxp, maxv, maxm);
-    nbodysys_t *nb1 = copy_nbodysys(nb);
+    //nbodysys_t *nb1 = copy_nbodysys(nb);
     nbodysys_t *nb2 = copy_nbodysys(nb);
     
     if (debug == 1) {
         print_nbodysys(nb);
     }
 
-    if ((debug == 3) || (debug == 1)) {
+    if (debug == 4) {
+        uint32_t n = (uint32_t)num_bodies;
+        uint32_t **check_order = (uint32_t**)malloc(n*sizeof(uint32_t*));
+        uint32_t *check_data = (uint32_t*)malloc(n*(n-1)*sizeof(uint32_t));
+        for (uint32_t i = 0; i < n; i++) {
+            check_order[i] = &check_data[i*(n-1)];
+        }
         dstart = omp_get_wtime();
-        brute(nb, num_iters, 1.f);
+        barnes_ordered(nb2, num_iters, 1.f, check_order);
         dstop = omp_get_wtime();
-        if (debug == 1) print_nbodysys(nb);
+        printf("%.5f\n", dstop-dstart);
+        dstart = omp_get_wtime();
+        brute_ordered(nb, num_iters, 1.f, check_order);
+        dstop = omp_get_wtime();
         printf("%.5f\n", dstop-dstart);
 
-        dstart = omp_get_wtime();
-        brute(nb1, num_iters, 1.f);
-        dstop = omp_get_wtime();
-        if (debug == 1) print_nbodysys(nb1);
-        printf("%.5f\n", dstop-dstart);
+        float dx = 0;
+        float dy = 0;
+        float dz = 0;
+        for (uint32_t i = 0; i < n; i++ ) {
+            dx += err(nb->bodies[i].ax, nb2->bodies[i].ax);
+            dy += err(nb->bodies[i].ay, nb2->bodies[i].ay);
+            dz += err(nb->bodies[i].az, nb2->bodies[i].az);
+        }
+        printf("%.9f %.9f %.9f\n", dx/n, dy/n, dz/n);
+        free(check_order[0]);
+        free(check_order);
+        free_nbodysys(nb);
+        free_nbodysys(nb2);
+
+        return 0;
     }
 
     dstart = omp_get_wtime();
@@ -135,28 +153,36 @@ int main(int argc, char **argv) {
     if (debug == 1) print_nbodysys(nb2);
     printf("%.5f\n", dstop-dstart);
 
+    /*
+    for (uint32_t i = 0; i < n; i++) {
+        for (uint32_t j = 0; j < n-1; j++) {
+            printf("%d ", check_order[i][j]);
+        }
+        printf("\n");
+    }*/
+
+    if ((debug == 3) || (debug == 1)) {
+        dstart = omp_get_wtime();
+        brute(nb, num_iters, 1.f);
+        dstop = omp_get_wtime();
+        if (debug == 1) print_nbodysys(nb);
+        printf("%.5f\n", dstop-dstart);
+    }
+
     if (debug == 3) {
         float dx = 0;
         float dy = 0;
         float dz = 0;
         int n = nb->num_bodies;
         for (int i = 0; i < n; i++ ) {
-            dx += err(nb->bodies[i].ax, nb1->bodies[i].ax);
-            dy += err(nb->bodies[i].ay, nb1->bodies[i].ay);
-            dz += err(nb->bodies[i].az, nb1->bodies[i].az);
-        }
-        printf("%.9f %.9f %.9f\n", dx/n, dy/n, dz/n);
-        dx = 0; dy = 0; dz = 0;
-        for (int i = 0; i < n; i++ ) {
-            dx += err(nb1->bodies[i].ax, nb2->bodies[i].ax);
-            dy += err(nb1->bodies[i].ay, nb2->bodies[i].ay);
-            dz += err(nb1->bodies[i].az, nb2->bodies[i].az);
+            dx += err(nb->bodies[i].ax, nb2->bodies[i].ax);
+            dy += err(nb->bodies[i].ay, nb2->bodies[i].ay);
+            dz += err(nb->bodies[i].az, nb2->bodies[i].az);
         }
         printf("%.9f %.9f %.9f\n", dx/n, dy/n, dz/n);
     }
 
     free_nbodysys(nb);
-    free_nbodysys(nb1);
     free_nbodysys(nb2);
 
     return 0;

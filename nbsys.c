@@ -1,5 +1,4 @@
 #include "nbsys.h"
-#include <assert.h>
 
 #define G 0.1f // universal gravitational constant should be 6.67408e-11
 #define MAX_P 100.f
@@ -11,14 +10,14 @@
 #define DIST_THRES 0.25f
 
 // debugging
-static int node_id;
-static int debug;
-//static int node_counter;
+static uint32_t node_id;
+static uint8_t debug;
+//static uint32_t node_counter;
 
 // carmack method for fast inverse square root (basically newton's method)
 static inline float rsqrt(float x) {
     float hx = 0.5f*x;
-    int i = *(int*)&x;
+    uint32_t i = *(uint32_t*)&x;
     i = 0x5f3759df - (i>>1);
     x = *(float*)&i;
     x *= (1.5f - hx*x*x);
@@ -57,21 +56,21 @@ inline void update_body(body_t* b, del_t t) {
 // function that initializes a node and returns a pointer to it. this function
 // is kept separate from the recursive call to ensure the pointer can be freed
 // before the call takes place.
-// recursively divide bodies into quadrants and create new child nodes from
+// recursively divide bodies uint32_to quadrants and create new child nodes from
 // each of these quadrants. stops when maximum node depth is reached or when
 // exactly one body is found in quadrant. quadrants with no bodies are not
 // initialized as nodes.
-void init_node(node_t *node, int dep, int max_dep, body_t *np_bodies, int* p_bodies, int p_nbodies, float p_x, float p_y, float p_z, float p_length) {
-    int i;
-    int n = p_nbodies;
+void init_node(node_t *node, uint8_t dep, uint8_t max_dep, body_t *np_bodies, uint32_t* p_bodies, uint32_t p_nbodies, float p_x, float p_y, float p_z, float p_length) {
+    uint32_t i;
+    uint32_t n = p_nbodies;
 
     node->id = node_id++;
     node->depth = dep;
     node->max_depth = max_dep;
 
     node->num_bodies = n;
-    node->bodies = (int*)malloc(p_nbodies*sizeof(int));
-    memcpy(node->bodies, p_bodies, p_nbodies*sizeof(int));
+    node->bodies = (uint32_t*)malloc(p_nbodies*sizeof(uint32_t));
+    memcpy(node->bodies, p_bodies, p_nbodies*sizeof(uint32_t));
 
     memset(&node->quad, 0, sizeof(node->quad));
     memset(&node->num_quad, 0, sizeof(node->num_quad));
@@ -84,26 +83,28 @@ void init_node(node_t *node, int dep, int max_dep, body_t *np_bodies, int* p_bod
     node->num_child = 0;
 
     if (n == 1) {
-        node->tm = np_bodies[node->bodies[0]].m;
-        node->cx = np_bodies[node->bodies[0]].px;
-        node->cy = np_bodies[node->bodies[0]].py;
-        node->cz = np_bodies[node->bodies[0]].pz;
+        uint32_t b = node->bodies[0];
+        node->tm = np_bodies[b].m;
+        node->cx = np_bodies[b].px;
+        node->cy = np_bodies[b].py;
+        node->cz = np_bodies[b].pz;
     }
     else if (n > 1) {
+        // quad keeps tracks of which bodies are in which quadrants by
+        // index. num_quad keeps track of the number of bodies in each
+        // of quad's quadrants.
+        uint32_t *quad_data = (uint32_t*)malloc(8*n*sizeof(uint32_t));
+        for (uint8_t i = 0; i < 8; i++) {
+            node->quad[i] = &quad_data[n*i];
+        }
         // calculate center of mass for each axis and total mass
         float t_tm = 0.f;
         float t_cx = 0.f;
         float t_cy = 0.f;
         float t_cz = 0.f;
-        // quad keeps tracks of which bodies are in which quadrants by
-        // index. num_quad keeps track of the number of bodies in each
-        // of quad's quadrants.
-        int *quad_data = (int*)malloc(8*n*sizeof(int));
-        for (int i = 0; i < 8; i++) {
-            node->quad[i] = &quad_data[n*i];
-        }
+
         for (i = 0; i < n; i++) {
-            int b = node->bodies[i];
+            uint32_t b = node->bodies[i];
 
             float t_m = np_bodies[b].m;
             t_cx += np_bodies[b].px*t_m;
@@ -113,11 +114,11 @@ void init_node(node_t *node, int dep, int max_dep, body_t *np_bodies, int* p_bod
 
             // derive quadrant q=0..7 from relative position on each axis
             // of body to center of current node
-            int b_x = np_bodies[b].px > node->px;
-            int b_y = np_bodies[b].py > node->py;
-            int b_z = np_bodies[b].pz > node->pz;
+            uint32_t b_x = np_bodies[b].px > node->px;
+            uint32_t b_y = np_bodies[b].py > node->py;
+            uint32_t b_z = np_bodies[b].pz > node->pz;
             // each quadrant is mapped to a number between 0..7
-            int q = b_x*4 + b_y*2 + b_z;
+            uint32_t q = b_x*4 + b_y*2 + b_z;
 
             // keep track of all bodies in each quadrant q
             node->quad[q][node->num_quad[q]] = b;
@@ -130,20 +131,20 @@ void init_node(node_t *node, int dep, int max_dep, body_t *np_bodies, int* p_bod
         node->cy = t_cy*invtm;
         node->cz = t_cz*invtm;
 #pragma omp parallel for
-        for (i = 0; i < 8; i++) {
+        for (uint8_t i = 0; i < 8; i++) {
             if (node->num_quad[i] > 0) {
                 // dynamically add child
 #pragma omp atomic
                 node->num_child++;
                 // magic functions to determine new position based on
                 // quadrant and length/size of node
-                int m_x = i/4 == 0 ? -1 : 1;
-                int m_y = (i/2)%2 == 0 ? -1 : 1;
-                int m_z = i%2 == 0 ? -1 : 1;
+                int8_t m_x = i/4 == 0 ? -1 : 1;
+                int8_t m_y = (i/2)%2 == 0 ? -1 : 1;
+                int8_t m_z = i%2 == 0 ? -1 : 1;
                 float new_px = node->px + m_x*0.25f*node->length;
                 float new_py = node->py + m_y*0.25f*node->length;
                 float new_pz = node->pz + m_z*0.25f*node->length;
-                // initialize new node and push into child array
+                // initialize new node and push uint32_to child array
                 // the recursive call *MUST BE PLACED LAST* to ensure the
                 // tail call optimization
                 node->child[i] = (node_t*)malloc(sizeof(node_t));
@@ -159,7 +160,7 @@ void free_node(node_t *n) {
     if (n->num_child > 0) {
         free(n->quad[0]);
 #pragma omp parallel for
-        for (int i = 0; i < 8; i++) {
+        for (uint8_t i = 0; i < 8; i++) {
             if (n->child[i] != 0) {
                 free_node(n->child[i]);
                 free(n->child[i]);
@@ -181,13 +182,37 @@ void check_node(node_t* node, body_t* body) {
     if (r > 0.f) {
         r = 1.f/sqrtf(r + E_SQR);
         if (node->length*r > DIST_THRES && node->num_child != 0) {
-            for (int i = 0; i < 8; i++) {
+            for (uint8_t i = 0; i < 8; i++) {
                 if (node->child[i] != 0)
                     check_node(node->child[i], body);
             }
         }
         else {// r != E | (ratio > DIST_THRES & node->num_child > 0)
-            float gmr = G*node->tm*(r*r*r);
+            float gmr = G*node->tm*r*r*r;
+            body->ax += gmr*rx;
+            body->ay += gmr*ry;
+            body->az += gmr*rz;
+        }
+    }
+}
+
+void check_node_ordered(node_t* node, body_t* body, uint32_t *order, uint32_t *size) {
+    double rx = node->cx - body->px;
+    double ry = node->cy - body->py;
+    double rz = node->cz - body->pz;
+    double r = rx*rx + ry*ry + rz*rz;
+    if (r > 0.) {
+        r = 1.f/sqrtf(r + E_SQR);
+        if (node->length*r > DIST_THRES && node->num_child != 0) {
+            for (uint8_t i = 0; i < 8; i++) {
+                if (node->child[i] != 0)
+                    check_node_ordered(node->child[i], body, order, size);
+            }
+        }
+        else {// r != E | (ratio > DIST_THRES & node->num_child > 0)
+            order[*size] = node->bodies[0];
+            *size += 1;
+            double gmr = G*node->tm*r*r*r;
             body->ax += gmr*rx;
             body->ay += gmr*ry;
             body->az += gmr*rz;
@@ -196,50 +221,47 @@ void check_node(node_t* node, body_t* body) {
 }
 
 void print_node(node_t *node, body_t *np_bodies) {
-    for (int j = 0; j < node->depth; j++) {
+    for (uint32_t j = 0; j < node->depth; j++) {
         printf("\t");
     }
     if (node->num_child == 0) {
         printf("%d %d %.3f %.3f %.3f %.3f\n", node->id, node->num_bodies, node->px, node->py, node->pz, node->length);
-        for (int i = 0; i < node->num_bodies; i++) {
-            for (int j = 0; j < node->depth; j++) {
+        for (uint32_t i = 0; i < node->num_bodies; i++) {
+            for (uint32_t j = 0; j < node->depth; j++) {
                 printf("\t");
             }
             printf("  %.3f %.3f %.3f %.3f\n", np_bodies[node->bodies[i]].px, np_bodies[node->bodies[i]].py, np_bodies[node->bodies[i]].pz, node->tm);
         }
     } else {
         printf("%d %d %.3f %.3f %.3f %.3f\n", node->id, node->num_bodies, node->cx, node->cy, node->cz, node->length);
-        for (int j = 0; j < node->depth; j++) {
+        for (uint32_t j = 0; j < node->depth; j++) {
             printf("\t");
         }
         printf("%d %.3f %.3f %.3f %.3f\n", node->depth, node->cx, node->cy, node->cz, node->tm);
-        for (int i = 0; i < 8; i++) {
+        for (uint32_t i = 0; i < 8; i++) {
             if (node->child[i] != 0)
                 print_node(node->child[i], np_bodies);
         }
     }
 }
 
-nbodysys_t *init_rand_nbodysys(int n, float max_p, float max_v, float max_m) {
-    int i;
-
+nbodysys_t *init_rand_nbodysys(uint32_t n, float max_p, float max_v, float max_m) {
     nbodysys_t *temp = (nbodysys_t*)malloc(sizeof(nbodysys_t));
     temp->bodies = (body_t*)malloc(n*sizeof(body_t));
     temp->maxp = max_p; temp->maxv = max_v; temp->maxm = max_m;
     temp->num_bodies = n;
 
     srand(time(NULL));
-    for (i = 0; i < n; i++) {
+    for (uint32_t i = 0; i < n; i++) {
         body_t *temp_body = init_rand_body(max_p, max_v, max_m);
         temp->bodies[i] = *temp_body;
         free(temp_body);
     }
-
     return temp;
 }
 
 nbodysys_t *copy_nbodysys(nbodysys_t *src) {
-    int n = src->num_bodies;
+    uint32_t n = src->num_bodies;
     nbodysys_t *dest = (nbodysys_t*)malloc(sizeof(nbodysys_t));
     dest->num_bodies = n;
     dest->maxp = src->maxp;
@@ -258,13 +280,13 @@ void free_nbodysys(nbodysys_t *nb) {
 
 void print_nbodysys(nbodysys_t *nb) {
     printf("\n");
-    for (int i = 0; i < nb->num_bodies; i++) {
-        printf("%.4f\t%.4f\t%.4f\n", nb->bodies[i].px, nb->bodies[i].py, nb->bodies[i].pz);
+    for (uint32_t i = 0; i < nb->num_bodies; i+=256) {
+        printf("%.9f\t%.9f\t%.9f\n", nb->bodies[i].px, nb->bodies[i].py, nb->bodies[i].pz);
     }
 }
 
-void brute(nbodysys_t *nb, int iters, del_t time) {
-    int iter, i, j, n;
+void brute(nbodysys_t *nb, uint32_t iters, del_t time) {
+    uint32_t iter, i, j, n;
     n = nb->num_bodies;
     for (iter = 0; iter < iters*time; iter += time) {
 #pragma omp parallel for private(j)
@@ -282,16 +304,43 @@ void brute(nbodysys_t *nb, int iters, del_t time) {
                     nb->bodies[i].az += gmr*rz;
                 }
             }
-            update_body(&nb->bodies[i], time);
         }
+#pragma omp parallel for
+        for (i = 0; i < n; i++)
+            update_body(&nb->bodies[i], time);
     }
 }
 
-void barnes(nbodysys_t *nb, int iters, del_t time) {
-    int iter, i;
-    int n = nb->num_bodies;
+void brute_ordered(nbodysys_t *nb, uint32_t iters, del_t time, uint32_t **check_order) {
+    uint32_t iter, i, j, n;
+    n = nb->num_bodies;
+    for (iter = 0; iter < iters*time; iter += time) {
+#pragma omp parallel for private(j)
+        for (i = 0; i < n; i++) {
+#pragma omp parallel for
+            for (j = 0; j < n-1; j++) {
+                uint32_t b = check_order[i][j];
+                double rx = nb->bodies[b].px - nb->bodies[i].px;
+                double ry = nb->bodies[b].py - nb->bodies[i].py;
+                double rz = nb->bodies[b].pz - nb->bodies[i].pz;
+                double r = 1.f/sqrtf(rx*rx + ry*ry + rz*rz + E_SQR);
+                double gmr = G*nb->bodies[b].m*r*r*r;
+                nb->bodies[i].ax += gmr*rx;
+                nb->bodies[i].ay += gmr*ry;
+                nb->bodies[i].az += gmr*rz;
+            }
+        }
+#pragma omp parallel for
+        for (i = 0; i < n; i++)
+            update_body(&nb->bodies[i], time);
+    }
+}
+
+void barnes(nbodysys_t *nb, uint32_t iters, del_t time) {
+    uint32_t iter, i;
+    uint32_t n = nb->num_bodies;
     node_t *root = 0;
-    int *root_bodies = (int*)malloc(n*sizeof(int));
+    uint32_t *root_bodies = (uint32_t*)malloc(n*sizeof(uint32_t));
     float max;
     //omp_set_nested(1);
 
@@ -311,8 +360,48 @@ void barnes(nbodysys_t *nb, int iters, del_t time) {
 #pragma omp parallel for
         for (i = 0; i < n; i++) {
             check_node(root, &nb->bodies[i]);
-            update_body(&nb->bodies[i], time);
         }
+#pragma omp parallel for
+        for (i = 0; i < n; i++)
+            update_body(&nb->bodies[i], time);
+        if (debug == 2) {
+            print_node(root, nb->bodies);
+        }
+        free_node(root);
+    }
+    free(root_bodies);
+    free(root);
+}
+
+void barnes_ordered(nbodysys_t *nb, uint32_t iters, del_t time, uint32_t **check_order) {
+    uint32_t iter, i;
+    uint32_t n = nb->num_bodies;
+    node_t *root = 0;
+    uint32_t *root_bodies = (uint32_t*)malloc(n*sizeof(uint32_t));
+    float max;
+    //omp_set_nested(1);
+
+    for (i = 0; i < n; i++) root_bodies[i] = i;
+
+    for (iter = 0; iter < iters*time; iter += time) {
+        max = 0.f;
+        node_id = 1;
+        for (i = 0; i < n; i++) {
+            max = fabs(nb->bodies[i].px) > max ? fabs(nb->bodies[i].px) : max;
+            max = fabs(nb->bodies[i].py) > max ? fabs(nb->bodies[i].py) : max;
+            max = fabs(nb->bodies[i].pz) > max ? fabs(nb->bodies[i].pz) : max;
+        }
+        root = (node_t*)malloc(sizeof(node_t));
+        init_node(root, 0, 16, nb->bodies, root_bodies, n, 0.f, 0.f, 0.f, max*2.f);
+
+#pragma omp parallel for
+        for (i = 0; i < n; i++) {
+            uint32_t size = 0;
+            check_node_ordered(root, &nb->bodies[i], check_order[i], &size);
+        }
+#pragma omp parallel for
+        for (i = 0; i < n; i++)
+            update_body(&nb->bodies[i], time);
         if (debug == 2) {
             print_node(root, nb->bodies);
         }
