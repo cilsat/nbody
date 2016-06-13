@@ -3,6 +3,7 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
@@ -25,7 +26,7 @@ typedef struct node {
     float tm;
 
     float length;
-    uint8_t depth, max_depth;
+    uint16_t depth, max_depth;
 
     uint32_t *bodies;
     uint32_t num_bodies;
