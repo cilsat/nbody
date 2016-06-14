@@ -21,22 +21,10 @@ typedef struct body {
 
 typedef struct node node_t;
 struct node {
-    uint32_t id;
-    float px, py, pz;
     float cx, cy, cz;
-    float tm;
-
-    float length;
-    uint16_t depth, max_depth;
-
-    body_t *body;
-    uint32_t num_bodies;
-
-    body_t **quad[8];
-    uint32_t num_quad[8];
-
-    node_t *child[8];
-    uint32_t num_child;
+    float gm;
+    uint8_t depth, num_child;
+    node_t *child;
 };
 
 typedef struct nbodysys {
@@ -52,10 +40,9 @@ body_t *init_rand_body(float max_p, float max_v, float max_m);
 void update_body(body_t* b, del_t t);
 
 // node methods
-void init_node(node_t *node, body_t **bodies, uint32_t num_bodies, uint8_t dep, uint8_t max_dep, float p_x, float p_y, float p_z, float p_length);
+void init_node(node_t *node, body_t **bodies, uint32_t num_bodies, uint8_t depth, uint8_t max_depth, float px, float py, float pz, float *length, float g);
 void free_node(node_t *node);
-void check_node(node_t *node, body_t *body);
-void check_node_ordered(node_t*, body_t*, body_t **, uint32_t*);
+void check_node(node_t *node, body_t *body, float length[]);
 void print_node(node_t*, body_t*);
 
 // nbodysys methods
@@ -67,7 +54,5 @@ void print_nbodysys(nbodysys_t*);
 // update methods
 void brute(nbodysys_t*, uint32_t iter, del_t);
 void barnes(nbodysys_t*, uint32_t iter, del_t);
-void brute_ordered(nbodysys_t*, uint32_t iter, del_t, body_t ***);
-void barnes_ordered(nbodysys_t*, uint32_t iter, del_t, body_t ***);
 
 #endif

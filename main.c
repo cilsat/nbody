@@ -119,54 +119,13 @@ int main(int argc, char **argv) {
     }
     printf("bodies: %d\n", num_bodies);
     printf("iterations: %d\n", num_iters);
-
-    if (debug == 4) {
-        uint32_t n = (uint32_t)num_bodies;
-        body_t ***check_order = malloc(n*sizeof(body_t **));
-        body_t **check_data = malloc(n*(n-1)*sizeof(body_t *));
-        for (uint32_t i = 0; i < n; i++) {
-            check_order[i] = &check_data[i*(n-1)];
-        }
-        dstart = omp_get_wtime();
-        barnes_ordered(nb2, num_iters, t, check_order);
-        dstop = omp_get_wtime();
-        printf("%.5f\n", dstop-dstart);
-        dstart = omp_get_wtime();
-        brute_ordered(nb, num_iters, t, check_order);
-        dstop = omp_get_wtime();
-        printf("%.5f\n", dstop-dstart);
-
-        free(check_order[0]);
-        free(check_order);
-        float dx = 0;
-        float dy = 0;
-        float dz = 0;
-#pragma omp parallel for
-        for (uint32_t i = 0; i < n; i++ ) {
-            dx += err(nb->bodies[i].px, nb2->bodies[i].px);
-            dy += err(nb->bodies[i].py, nb2->bodies[i].py);
-            dz += err(nb->bodies[i].pz, nb2->bodies[i].pz);
-        }
-        printf("%.12f %.12f %.12f\n", dx/n, dy/n, dz/n);
-        free_nbodysys(nb);
-        free_nbodysys(nb2);
-
-        return 0;
-    }
+    printf("node size: %ld\n", sizeof(node_t));
 
     dstart = omp_get_wtime();
     barnes(nb2, num_iters, t);
     dstop = omp_get_wtime();
     if (debug == 1) print_nbodysys(nb2);
     printf("%.5f\n", dstop-dstart);
-
-    /*
-    for (uint32_t i = 0; i < n; i++) {
-        for (uint32_t j = 0; j < n-1; j++) {
-            printf("%d ", check_order[i][j]);
-        }
-        printf("\n");
-    }*/
 
     if ((debug == 3) || (debug == 1)) {
         dstart = omp_get_wtime();
