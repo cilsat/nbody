@@ -120,8 +120,8 @@ int main(int argc, char **argv) {
 
     if (debug == 4) {
         uint32_t n = (uint32_t)num_bodies;
-        uint32_t **check_order = (uint32_t**)malloc(n*sizeof(uint32_t*));
-        uint32_t *check_data = (uint32_t*)malloc(n*(n-1)*sizeof(uint32_t));
+        body_t ***check_order = malloc(n*sizeof(body_t **));
+        body_t **check_data = malloc(n*(n-1)*sizeof(body_t *));
         for (uint32_t i = 0; i < n; i++) {
             check_order[i] = &check_data[i*(n-1)];
         }
@@ -151,6 +151,9 @@ int main(int argc, char **argv) {
 
         return 0;
     }
+    printf("body*: %ld\n", sizeof(body_t *));
+    printf("body: %ld\n", sizeof(body_t));
+    printf("int: %ld\n", sizeof(uint32_t));
 
     dstart = omp_get_wtime();
     barnes(nb2, num_iters, t);
