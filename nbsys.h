@@ -12,7 +12,7 @@
 
 typedef float del_t;
 
-typedef struct body {
+typedef struct {
     float px, py, pz;
     float vx, vy, vz;
     float ax, ay, az;
@@ -27,7 +27,11 @@ struct node {
     node_t *child;
 };
 
-typedef struct nbodysys {
+typedef struct {
+    signed char x[8], y[8], z[8];
+} ttable_t;
+
+typedef struct {
     body_t *bodies;
     uint32_t num_bodies;
     float maxp, maxv, maxm;
@@ -40,7 +44,7 @@ body_t *init_rand_body(float max_p, float max_v, float max_m);
 void update_body(body_t* b, del_t t);
 
 // node methods
-void init_node(node_t *node, body_t **bodies, uint32_t num_bodies, uint8_t depth, uint8_t max_depth, float px, float py, float pz, float *length, float g);
+void init_node(node_t *node, body_t **bodies, uint32_t num_bodies, uint8_t depth, uint8_t max_depth, float pos[], ttable_t magic, float *length, float g);
 void free_node(node_t *node);
 void check_node(node_t *node, body_t *body, float length[]);
 void print_node(node_t*, body_t*);

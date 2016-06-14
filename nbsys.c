@@ -96,12 +96,12 @@ inline void update_body(body_t* b, del_t t) {
 // each of these quadrants. stops when maximum node depth is reached or when
 // exactly one body is found in quadrant. quadrants with no bodies are not
 // initialized as nodes.
-void init_node(node_t *node, body_t **p_bodies, uint32_t p_nbodies, uint8_t depth, uint8_t max_depth, float px, float py, float pz, float *length, float g) {
+void init_node(node_t *node, body_t **p_bodies, uint32_t p_nbodies, uint8_t depth, uint8_t max_depth, float pos[], ttable_t magic, float *length, float g) {
     uint32_t i;
     uint8_t q;
     uint32_t n = p_nbodies;
 
-    node_id++;
+    //node_id++;
     node->depth = depth;
     node->child = 0;
     node->num_child = 0;
@@ -153,9 +153,9 @@ void init_node(node_t *node, body_t **p_bodies, uint32_t p_nbodies, uint8_t dept
             body_t *b = p_bodies[i];
             // derive quadrant q=0..7 from relative position on each axis
             // of body to center of current node
-            bool b_x = b->px > px;
-            bool b_y = b->py > py;
-            bool b_z = b->pz > pz;
+            bool b_x = b->px > pos[0];
+            bool b_y = b->py > pos[1];
+            bool b_z = b->pz > pos[2];
             // each quadrant is mapped to a number between 0..7
             uint8_t q = b_x*4 + b_y*2 + b_z;
             // keep track of all bodies in each quadrant q
@@ -164,30 +164,30 @@ void init_node(node_t *node, body_t **p_bodies, uint32_t p_nbodies, uint8_t dept
             num_quad[q]++;
         }
         free(p_bodies);
-//#pragma omp parallel for
+
+        uint8_t c = 0, nq[8];
+        float n_pos[8][3];
+        float len = 0.25f*length[depth];
         for (q = 0; q < 8; q++) {
             if (num_quad[q] > 0) {
-                // dynamically add child
-//#pragma omp atomic
-                node->num_child++;
-                uint8_t c = node->num_child;
                 // magic functions to determine new position based on
                 // quadrant and length/size of node
-                int8_t m_x = q/4 == 0 ? -1 : 1;
-                int8_t m_y = (q/2)%2 == 0 ? -1 : 1;
-                int8_t m_z = q%2 == 0 ? -1 : 1;
-                float new_px = px + m_x*0.25f*length[depth];
-                float new_py = py + m_y*0.25f*length[depth];
-                float new_pz = pz + m_z*0.25f*length[depth];
-                // initialize new node and push uint32_to child array
-                // the recursive call *MUST BE PLACED LAST* to ensure the
-                // tail call optimization
-                node->child = realloc(node->child, c*sizeof(node_t));
-                init_node(&node->child[c-1], quad[q], num_quad[q], depth+1, max_depth, new_px, new_py, new_pz, length, g);
+                n_pos[c][0] = pos[0] + len*magic.x[q];
+                n_pos[c][1] = pos[1] + len*magic.y[q];
+                n_pos[c][2] = pos[2] + len*magic.z[q];
+                nq[c] = q;
+                c++;
             }
-            else {
-                free(quad[q]);
-            }
+            else free(quad[q]);
+        }
+        // allocate new nodes
+        node->child = malloc(c*sizeof(node_t));
+        node->num_child = c;
+#pragma omp parallel for
+        for (q = 0; q < c; q++) {
+            // initialize new nodes the recursive call *MUST BE PLACED LAST* to
+            // ensure the tail call optimization
+            init_node(&node->child[q], quad[nq[q]], num_quad[nq[q]], depth+1, max_depth, n_pos[q], magic, length, g);
         }
     }
 }
@@ -320,13 +320,21 @@ void barnes(nbodysys_t *nb, uint32_t iters, del_t time) {
     uint32_t iter=0, i;
     uint32_t n = nb->num_bodies;
     node_t *root_node = malloc(sizeof(node_t));
-    uint8_t max_dep = (uint8_t)ceil(DEPTH*pow(nb->num_bodies, 0.125));
     float g = G;
-    float *length = malloc(max_dep*sizeof(float));
-    if (debug == 2) printf("max depth: %d\n", max_dep);
 
+    uint8_t max_dep = (uint8_t)ceil(DEPTH*pow(nb->num_bodies, 0.125));
+    float *length = malloc(max_dep*sizeof(float));
     for (uint8_t d = 0; d < max_dep; d++) {
         length[d] = pow(0.5f, d)*MAX_P;
+    }
+    if (debug == 2) printf("max depth: %d\n", max_dep);
+
+    float pos[3] = { 0.f };
+    ttable_t magic;
+    for (uint8_t q = 0; q < 8; q++) {
+        magic.x[q] = q/4 == 0 ? -1 : 1;
+        magic.y[q] = (q/2)%2 == 0 ? -1 : 1;
+        magic.z[q] = q%2 == 0 ? -1 : 1;
     }
 
     while (iter++ < iters) {
@@ -335,7 +343,7 @@ void barnes(nbodysys_t *nb, uint32_t iters, del_t time) {
         for (i = 0; i < n; i++){
             root_bodies[i] = &nb->bodies[i];
         }
-        init_node(root_node, root_bodies, n, 0, max_dep, 0.f, 0.f, 0.f, length, g);
+        init_node(root_node, root_bodies, n, 0, max_dep, pos, magic, length, g);
         if (debug == 2) {
             print_node(root_node, nb->bodies);
             free_node(root_node);
