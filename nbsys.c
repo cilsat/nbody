@@ -9,13 +9,13 @@
 #define G 0.01f // universal gravitational constant should be 6.67408e-11
 #define E_SQR 0.f // softening factor
 #define DEBUG 0
-#define DIST_THRES 0.5f
-#define DEPTH 3
+#define DIST_THRES 0.75f
+#define DEPTH 2
 #define DBG_DISPLAY 32
 
 // debugging
 static uint32_t node_id = 0;
-static uint32_t node_check = 0;
+//static uint32_t node_check = 0;
 static uint8_t debug = DEBUG;
 //static uint32_t node_counter;
 
@@ -43,25 +43,19 @@ body_t *init_rand_body(float max_p, float max_v, float max_m) {
     temp->vx = rand_range(max_v);
     temp->vy = rand_range(max_v);
     temp->vz = rand_range(max_v);
-    temp->ax = 0.f;
-    temp->ay = 0.f;
-    temp->az = 0.f;
     temp->m = max_m*((float) rand() / (float) RAND_MAX);
 
     return temp;
 }
 
 // updates the velocity and position of a body from its acceleration.
-inline void update_body(body_t* b, del_t t) {
-    b->vx += b->ax*t;
-    b->vy += b->ay*t;
-    b->vz += b->az*t;
+inline void update_body(body_t* b, del_t t, float a[]) {
+    b->vx += a[0]*t;
+    b->vy += a[1]*t;
+    b->vz += a[2]*t;
     b->px += b->vx*t;
     b->py += b->vy*t;
     b->pz += b->vz*t;
-    b->ax = 0.f;
-    b->ay = 0.f;
-    b->az = 0.f;
 
     if (b->px > LEN_MAX) {
         b->px = LEN_MAX;
@@ -209,7 +203,7 @@ void free_node(node_t *node) {
  * guaranteed with -O2 as long as check_node is called at the end and no lines
  * follow it. >90% of the time is spent in this subroutine.
  */
-void check_node(node_t* node, body_t *body, float *length) {
+void check_node(node_t* node, body_t *body, float *a, float *length) {
     float rx = node->cx - body->px;
     float ry = node->cy - body->py;
     float rz = node->cz - body->pz;
@@ -219,14 +213,14 @@ void check_node(node_t* node, body_t *body, float *length) {
         r = 1.f/sqrtf(r + E_SQR);
         if (node->num_child != 0 && length[node->depth]*r > DIST_THRES) {
             for (uint8_t i = 0; i < node->num_child; i++) {
-                check_node(&node->child[i], body, length);
+                check_node(&node->child[i], body, a, length);
             }
         }
         else {// r != E | (ratio > DIST_THRES & node->num_child > 0)
             float gmr = node->gm*r*r*r;
-            body->ax += gmr*rx;
-            body->ay += gmr*ry;
-            body->az += gmr*rz;
+            a[0] += gmr*rx;
+            a[1] += gmr*ry;
+            a[2] += gmr*rz;
         }
     }
 }
@@ -291,9 +285,15 @@ void print_nbodysys(nbodysys_t *nb) {
 }
 
 void brute(nbodysys_t *nb, uint32_t iters, del_t time) {
-    uint32_t iter, i, j, n;
+    uint32_t iter=0, i, j, n;
     n = nb->num_bodies;
-    for (iter = 0; iter < iters*time; iter += time) {
+    float **a = malloc(n*sizeof(float *));
+    float *data = malloc(n*3*sizeof(float));
+    for (i = 0; i < n; i++) a[i] = &data[i*3];
+    while (iter++ < iters) {
+        for (i = 0; i < n; i++) {
+            a[i][0] = 0.f; a[i][1] = 0.f; a[i][2] = 0.f;
+        }
 #pragma omp parallel for private(j)
         for (i = 0; i < n; i++) {
 #pragma omp parallel for
@@ -304,16 +304,18 @@ void brute(nbodysys_t *nb, uint32_t iters, del_t time) {
                     float rz = nb->bodies[j].pz - nb->bodies[i].pz;
                     float r = 1.f/sqrtf(rx*rx + ry*ry + rz*rz + E_SQR);
                     float gmr = G*nb->bodies[j].m*r*r*r;
-                    nb->bodies[i].ax += gmr*rx;
-                    nb->bodies[i].ay += gmr*ry;
-                    nb->bodies[i].az += gmr*rz;
+                    a[i][0] += gmr*rx;
+                    a[i][1] += gmr*ry;
+                    a[i][2] += gmr*rz;
                 }
             }
         }
 #pragma omp parallel for
         for (i = 0; i < n; i++)
-            update_body(&nb->bodies[i], time);
+            update_body(&nb->bodies[i], time, a[i]);
     }
+    free(a[0]);
+    free(a);
 }
 
 void barnes(nbodysys_t *nb, uint32_t iters, del_t time) {
@@ -330,6 +332,10 @@ void barnes(nbodysys_t *nb, uint32_t iters, del_t time) {
     if (debug == 2) printf("max depth: %d\n", max_dep);
 
     float pos[3] = { 0.f };
+    float **a = malloc(n*sizeof(float *));
+    float *data = malloc(n*3*sizeof(float));
+    for (i = 0; i < n; i++) a[i] = &data[i*3];
+
     ttable_t magic;
     for (uint8_t q = 0; q < 8; q++) {
         magic.x[q] = q/4 == 0 ? -1 : 1;
@@ -337,29 +343,25 @@ void barnes(nbodysys_t *nb, uint32_t iters, del_t time) {
         magic.z[q] = q%2 == 0 ? -1 : 1;
     }
 
+    printf("pow!\n");
     while (iter++ < iters) {
         node_id = 0;
         body_t **root_bodies = malloc(n*sizeof(body_t *));
         for (i = 0; i < n; i++){
             root_bodies[i] = &nb->bodies[i];
+            a[i][0] = 0.f; a[i][1] = 0.f; a[i][2] = 0.f;
         }
         init_node(root_node, root_bodies, n, 0, max_dep, pos, magic, length, g);
-        if (debug == 2) {
-            print_node(root_node, nb->bodies);
-            free_node(root_node);
-            printf("nodes: %d\n", node_id);
-            printf("checked: %d\n", node_check);
-            node_check = 0;
-            continue;
-        }
 #pragma omp parallel for
         for (i = 0; i < n; i++)
-            check_node(root_node, &nb->bodies[i], length);
+            check_node(root_node, &nb->bodies[i], a[i], length);
 #pragma omp parallel for
         for (i = 0; i < n; i++)
-            update_body(&nb->bodies[i], time);
+            update_body(&nb->bodies[i], time, a[i]);
         free_node(root_node);
     }
+    free(a[0]);
+    free(a);
     free(length);
     free(root_node);
 }
