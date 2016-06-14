@@ -54,7 +54,7 @@ void update_body(body_t* b, del_t t);
 // node methods
 void init_node(node_t *node, body_t **bodies, uint32_t num_bodies, uint8_t dep, uint8_t max_dep, float p_x, float p_y, float p_z, float p_length);
 void free_node(node_t *node);
-void check_node(node_t *node, body_t body);
+void check_node(node_t *node, body_t *body);
 void check_node_ordered(node_t*, body_t*, body_t **, uint32_t*);
 void print_node(node_t*, body_t*);
 

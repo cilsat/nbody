@@ -15,6 +15,7 @@
 
 // debugging
 static uint32_t node_id = 0;
+static uint32_t node_check = 0;
 static uint8_t debug = DEBUG;
 //static uint32_t node_counter;
 
@@ -100,7 +101,7 @@ void init_node(node_t *node, body_t **p_bodies, uint32_t p_nbodies, uint8_t dep,
     uint8_t q;
     uint32_t n = p_nbodies;
 
-    //node->id = node_id++;
+    node->id = node_id++;
     node->depth = dep;
     node->max_depth = max_dep;
 
@@ -218,11 +219,12 @@ void free_node(node_t *node) {
  * guaranteed with -O2 as long as check_node is called at the end and no lines
  * follow it. >90% of the time is spent in this subroutine.
  */
-void check_node(node_t* node, body_t body) {
-    float rx = node->cx - body.px;
-    float ry = node->cy - body.py;
-    float rz = node->cz - body.pz;
+void check_node(node_t* node, body_t *body) {
+    float rx = node->cx - body->px;
+    float ry = node->cy - body->py;
+    float rz = node->cz - body->pz;
     float r = rx*rx + ry*ry + rz*rz;
+    //node_check++;
     if (r > 0.f) {
         r = 1.f/sqrtf(r + E_SQR);
         if (node->num_child != 0 && node->length*r > DIST_THRES) {
@@ -233,9 +235,9 @@ void check_node(node_t* node, body_t body) {
         }
         else {// r != E | (ratio > DIST_THRES & node->num_child > 0)
             float gmr = G*node->tm*r*r*r;
-            body.ax += gmr*rx;
-            body.ay += gmr*ry;
-            body.az += gmr*rz;
+            body->ax += gmr*rx;
+            body->ay += gmr*ry;
+            body->az += gmr*rz;
         }
     }
 }
@@ -395,6 +397,7 @@ void barnes(nbodysys_t *nb, uint32_t iters, del_t time) {
             root_bodies[i] = &nb->bodies[i];
         }
         init_node(root_node, root_bodies, n, 0, max_dep, 0.f, 0.f, 0.f, MAX_P);
+        printf("nodes: %d\n", node_id);
         if (debug == 2) {
             print_node(root_node, nb->bodies);
             free_node(root_node);
@@ -402,7 +405,8 @@ void barnes(nbodysys_t *nb, uint32_t iters, del_t time) {
         }
 #pragma omp parallel for
         for (i = 0; i < n; i++)
-            check_node(root_node, nb->bodies[i]);
+            check_node(root_node, &nb->bodies[i]);
+        printf("checked: %d\n", node_check);
 #pragma omp parallel for
         for (i = 0; i < n; i++)
             update_body(&nb->bodies[i], time);

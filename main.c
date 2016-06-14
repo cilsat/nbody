@@ -117,6 +117,8 @@ int main(int argc, char **argv) {
     if (debug == 1) {
         print_nbodysys(nb);
     }
+    printf("bodies: %d\n", num_bodies);
+    printf("iterations: %d\n", num_iters);
 
     if (debug == 4) {
         uint32_t n = (uint32_t)num_bodies;
@@ -151,9 +153,6 @@ int main(int argc, char **argv) {
 
         return 0;
     }
-    printf("body*: %ld\n", sizeof(body_t *));
-    printf("body: %ld\n", sizeof(body_t));
-    printf("int: %ld\n", sizeof(uint32_t));
 
     dstart = omp_get_wtime();
     barnes(nb2, num_iters, t);
