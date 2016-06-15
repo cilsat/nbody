@@ -44,6 +44,8 @@ flags = [
 '-fexceptions',
 '-I',
 '/usr/lib/gcc/x86_64-linux-gnu/5/include',
+'-I',
+'/usr/local/include/jemalloc',
 '-DNDEBUG',
 '-x',
 'c',

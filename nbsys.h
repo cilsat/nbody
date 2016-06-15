@@ -1,7 +1,7 @@
 #ifndef __NBSYS_H__
 #define __NBSYS_H__
 
-#include <stdlib.h>
+#include <jemalloc/jemalloc.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -19,12 +19,15 @@ typedef struct {
 } body_t;
 
 typedef struct node node_t;
+#pragma pack(push)
+#pragma pack(4)
 struct node {
     float cx, cy, cz;
     float gm;
     uint8_t depth, num_child;
     node_t *child;
 };
+#pragma pack(pop)
 
 typedef struct {
     signed char x[8], y[8], z[8];

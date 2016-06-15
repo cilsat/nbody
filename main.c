@@ -119,7 +119,7 @@ int main(int argc, char **argv) {
     }
     printf("bodies: %d\n", num_bodies);
     printf("iterations: %d\n", num_iters);
-    printf("node size: %ld\n", sizeof(node_t));
+    printf("body/node size: %ld/%ld\n", sizeof(ttable_t), sizeof(node_t));
 
     dstart = omp_get_wtime();
     barnes(nb2, num_iters, t);

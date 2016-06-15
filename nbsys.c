@@ -324,6 +324,8 @@ void barnes(nbodysys_t *nb, uint32_t iters, del_t time) {
     node_t *root_node = malloc(sizeof(node_t));
     float g = G;
 
+    // maximum tree depth should be proportional to the number of nodes to the
+    // inverse power of eight. the size of a node is proportional to its depth
     uint8_t max_dep = (uint8_t)ceil(DEPTH*pow(nb->num_bodies, 0.125));
     float *length = malloc(max_dep*sizeof(float));
     for (uint8_t d = 0; d < max_dep; d++) {
@@ -331,11 +333,17 @@ void barnes(nbodysys_t *nb, uint32_t iters, del_t time) {
     }
     if (debug == 2) printf("max depth: %d\n", max_dep);
 
+    // acceleration is calculated each iteration and its value is assumed to be
+    // independent of its previous value (starts from 0).
     float pos[3] = { 0.f };
     float **a = malloc(n*sizeof(float *));
     float *data = malloc(n*3*sizeof(float));
     for (i = 0; i < n; i++) a[i] = &data[i*3];
 
+    // boolean truth table to determine a quadrant's position relative to the
+    // center of the node, with a unique 3-bit value (in 3 dimensions) for each
+    // quadrant. for instance, quadrant 0 is x negative, y negative, and z
+    // negative relative to the center of the node.
     ttable_t magic;
     for (uint8_t q = 0; q < 8; q++) {
         magic.x[q] = q/4 == 0 ? -1 : 1;
