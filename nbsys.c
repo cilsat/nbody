@@ -7,10 +7,10 @@
 #define LEN_MAX MAX_P*0.5f
 #define LEN_MIN MAX_P*-0.5f
 #define G 0.01f // universal gravitational constant should be 6.67408e-11
-#define E_SQR 0.f // softening factor
+#define E_SQR 100.f // softening factor
 #define DEBUG 0
-#define DIST_THRES 0.75f
-#define DEPTH 2
+#define DIST_THRES 0.5f
+#define DEPTH 3
 #define DBG_DISPLAY 32
 
 // debugging
@@ -91,14 +91,14 @@ inline void update_body(body_t* b, del_t t, float a[]) {
 // exactly one body is found in quadrant. quadrants with no bodies are not
 // initialized as nodes.
 void init_node(node_t *node, body_t **p_bodies, uint32_t p_nbodies, uint8_t depth, uint8_t max_depth, float pos[], ttable_t magic, float *length, float g) {
-    uint32_t i;
-    uint8_t q;
-    uint32_t n = p_nbodies;
+    uint32_t i;             // bodies iterator
+    uint8_t q;              // quadrants iterator
+    uint32_t n = p_nbodies; // number of bodies in node
 
     //node_id++;
-    node->depth = depth;
-    node->child = 0;
-    node->num_child = 0;
+    node->depth = depth;    // depth determines size and position of node
+    node->child = 0;        // pointer to child nodes initialized to null
+    node->num_child = 0;    // number of child nodes
 
     if (n == 1) {
         body_t *b = p_bodies[0];
@@ -203,21 +203,21 @@ void free_node(node_t *node) {
  * guaranteed with -O2 as long as check_node is called at the end and no lines
  * follow it. >90% of the time is spent in this subroutine.
  */
-void check_node(node_t* node, body_t *body, float *a, float *length) {
-    float rx = node->cx - body->px;
-    float ry = node->cy - body->py;
-    float rz = node->cz - body->pz;
+void check_node(node_t *node, body_t *body, float *a, float *length) {
+    node_t temp = *node;
+    float rx = temp.cx - body->px;
+    float ry = temp.cy - body->py;
+    float rz = temp.cz - body->pz;
     float r = rx*rx + ry*ry + rz*rz;
-    //node_check++;
     if (r > 0.f) {
         r = 1.f/sqrtf(r + E_SQR);
-        if (node->num_child != 0 && length[node->depth]*r > DIST_THRES) {
-            for (uint8_t i = 0; i < node->num_child; i++) {
-                check_node(&node->child[i], body, a, length);
+        if (temp.num_child != 0 && length[temp.depth]*r > DIST_THRES) {
+            for (uint8_t i = 0; i < temp.num_child; i++) {
+                check_node(&temp.child[i], body, a, length);
             }
         }
-        else {// r != E | (ratio > DIST_THRES & node->num_child > 0)
-            float gmr = node->gm*r*r*r;
+        else {// r != E | (ratio > DIST_THRES & temp->num_child > 0)
+            float gmr = temp.gm*r*r*r;
             a[0] += gmr*rx;
             a[1] += gmr*ry;
             a[2] += gmr*rz;
@@ -296,12 +296,13 @@ void brute(nbodysys_t *nb, uint32_t iters, del_t time) {
         }
 #pragma omp parallel for private(j)
         for (i = 0; i < n; i++) {
+            body_t temp = nb->bodies[i];
 #pragma omp parallel for
             for (j = 0; j < n; j++) {
                 if (i != j) {
-                    float rx = nb->bodies[j].px - nb->bodies[i].px;
-                    float ry = nb->bodies[j].py - nb->bodies[i].py;
-                    float rz = nb->bodies[j].pz - nb->bodies[i].pz;
+                    float rx = nb->bodies[j].px - temp.px;
+                    float ry = nb->bodies[j].py - temp.py;
+                    float rz = nb->bodies[j].pz - temp.pz;
                     float r = 1.f/sqrtf(rx*rx + ry*ry + rz*rz + E_SQR);
                     float gmr = G*nb->bodies[j].m*r*r*r;
                     a[i][0] += gmr*rx;

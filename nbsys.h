@@ -23,9 +23,9 @@ typedef struct node node_t;
 #pragma pack(4)
 struct node {
     float cx, cy, cz;
-    float gm;
     uint8_t depth, num_child;
     node_t *child;
+    float gm;
 };
 #pragma pack(pop)
 
