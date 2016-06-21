@@ -19,7 +19,7 @@ static uint32_t node_id = 0;
 static uint8_t debug = DEBUG;
 //static uint32_t node_counter;
 
-/* carmack method for fast inverse square root (basically newton's method)
+// carmack method for fast inverse square root (basically newton's method)
 static inline float rsqrt(float x) {
     float hx = 0.5f*x;
     uint32_t i = *(uint32_t*)&x;
@@ -27,7 +27,7 @@ static inline float rsqrt(float x) {
     x = *(float*)&i;
     x *= (1.5f - hx*x*x);
     return x;
-}*/
+}
 
 static inline float rand_range(float max) {
     return max*(((float)rand() / (float)RAND_MAX) - 0.5f);
@@ -43,9 +43,7 @@ body_t *init_rand_body(float max_p, float max_v, float max_m) {
     temp->vx = rand_range(max_v);
     temp->vy = rand_range(max_v);
     temp->vz = rand_range(max_v);
-    temp->ax = 0.f;
-    temp->ay = 0.f;
-    temp->az = 0.f;
+    temp->ax = 0.f; temp->ay = 0.f; temp->az = 0.f;
     temp->m = max_m*((float) rand() / (float) RAND_MAX);
 
     return temp;
@@ -144,10 +142,9 @@ void init_node(node_t *node, body_t **p_bodies, uint32_t p_nbodies, uint8_t dept
         // index. num_quad keeps track of the number of bodies in each
         // of quad's quadrants.
         body_t **quad[8];
-        uint32_t num_quad[8];
+        uint32_t num_quad[8] = { 0 };
         for (q = 0; q < 8; q++) {
             quad[q] = malloc(n*sizeof(body_t *));
-            num_quad[q] = 0;
         }
         for (i = 0; i < n; i++) {
             body_t *b = p_bodies[i];
@@ -291,27 +288,35 @@ void print_nbodysys(nbodysys_t *nb) {
 }
 
 void brute(nbodysys_t *nb, uint32_t iters, del_t time) {
-    uint32_t iter=0, i, j, n;
+    uint32_t iter=0, i, j, k, n;
     n = nb->num_bodies;
+    uint32_t n1 = n-1;
+    uint32_t n_iter = n*n1/2;
     float *gm = malloc(n*sizeof(float));
     for (i = 0; i < n; i++) {
         gm[i] = G*nb->bodies[i].m;
     }
     while (iter++ < iters) {
-#pragma omp parallel for collapse(2)
-        for (i = 0; i < n; i++) {
-            for (j = 0; j < n; j++) {
-                if (i != j) {
-                    float rx = nb->bodies[j].px - nb->bodies[i].px;
-                    float ry = nb->bodies[j].py - nb->bodies[i].py;
-                    float rz = nb->bodies[j].pz - nb->bodies[i].pz;
-                    float r = 1.f/sqrtf(rx*rx + ry*ry + rz*rz + E_SQR);
-                    float gmr = gm[j]*(r*r*r);
-                    nb->bodies[i].ax += gmr*rx;
-                    nb->bodies[i].ay += gmr*ry;
-                    nb->bodies[i].az += gmr*rz;
-                }
+#pragma omp parallel for private(i,j)
+        for (k = 0; k < n_iter; k++) {
+            i = k/n1; j = k%n1;
+            if (j >= i) {
+                i = n1 - i;
+                j = n1 - j - 1;
             }
+            float rx = nb->bodies[i].px - nb->bodies[j].px;
+            float ry = nb->bodies[i].py - nb->bodies[j].py;
+            float rz = nb->bodies[i].pz - nb->bodies[j].pz;
+            float r = 1.f/sqrtf(rx*rx + ry*ry + rz*rz + E_SQR);
+            r *= r*r;
+            float gmr = nb->bodies[j].m*G*r;
+            nb->bodies[i].ax -= gmr*rx;
+            nb->bodies[i].ay -= gmr*ry;
+            nb->bodies[i].az -= gmr*rz;
+            gmr = nb->bodies[i].m*G*r;
+            nb->bodies[j].ax += gmr*rx;
+            nb->bodies[j].ay += gmr*ry;
+            nb->bodies[j].az += gmr*rz;
         }
 #pragma omp parallel for
         for (i = 0; i < n; i++)
@@ -325,6 +330,7 @@ void barnes(nbodysys_t *nb, uint32_t iters, del_t time) {
     uint32_t n = nb->num_bodies;
     node_t *root_node = malloc(sizeof(node_t));
     float g = G;
+    //omp_set_nested(1);
 
     // maximum tree depth should be proportional to the number of nodes to the
     // inverse power of eight. the size of a node is proportional to its depth

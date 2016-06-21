@@ -14,21 +14,21 @@ typedef float del_t;
 
 typedef struct {
     float px, py, pz;
-    float vx, vy, vz;
     float ax, ay, az;
     float m;
+    float vx, vy, vz;
 } body_t;
 
 typedef struct node node_t;
-#pragma pack(push)
-#pragma pack(4)
+//#pragma pack(push)
+//#pragma pack(4)
 struct node {
     float cx, cy, cz;
-    uint8_t depth, num_child;
-    node_t *child;
     float gm;
+    node_t *child;
+    uint8_t depth, num_child;
 };
-#pragma pack(pop)
+//#pragma pack(pop)
 
 typedef struct {
     signed char x[8], y[8], z[8];

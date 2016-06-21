@@ -39,12 +39,12 @@ void read_file(nbodysys_t* nb, char* file) {
             newnum = strtok(NULL, ",");
             nb->bodies[i].pz = strtof(newnum, NULL);
             newnum = strtok(NULL, ",");
-            nb->bodies[i].vx = strtof(newnum, NULL);
+            /*nb->bodies[i].vx = strtof(newnum, NULL);
             newnum = strtok(NULL, ",");
             nb->bodies[i].vy = strtof(newnum, NULL);
             newnum = strtok(NULL, ",");
             nb->bodies[i].vz = strtof(newnum, NULL);
-            newnum = strtok(NULL, ",");
+            newnum = strtok(NULL, ",");*/
             nb->bodies[i].m = strtof(newnum, NULL);
             newline = strtok(NULL, "\n");
             i++;
@@ -119,7 +119,7 @@ int main(int argc, char **argv) {
     }
     printf("bodies: %d\n", num_bodies);
     printf("iterations: %d\n", num_iters);
-    printf("body/node size: %ld/%ld\n", sizeof(ttable_t), sizeof(node_t));
+    printf("body/node size: %ld/%ld\n", sizeof(body_t), sizeof(node_t));
 
     dstart = omp_get_wtime();
     barnes(nb2, num_iters, t);
