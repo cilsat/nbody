@@ -15,6 +15,7 @@ typedef float del_t;
 typedef struct {
     float px, py, pz;
     float vx, vy, vz;
+    float ax, ay, az;
     float m;
 } body_t;
 
@@ -43,12 +44,12 @@ typedef void (*update) (nbodysys_t *nb, uint32_t iters, del_t time, uint32_t* op
 
 // body methods
 body_t *init_rand_body(float max_p, float max_v, float max_m);
-void update_body(body_t* b, del_t t, float *a);
+void update_body(body_t* b, del_t t);
 
 // node methods
 void init_node(node_t *node, body_t **bodies, uint32_t num_bodies, uint8_t depth, uint8_t max_depth, float pos[], ttable_t magic, float *length, float g);
 void free_node(node_t *node);
-void check_node(node_t *node, body_t *body, float *a, float *length);
+void check_node(node_t *node, body_t *body, float *length);
 void print_node(node_t*, body_t*);
 
 // nbodysys methods

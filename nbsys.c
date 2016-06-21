@@ -43,19 +43,25 @@ body_t *init_rand_body(float max_p, float max_v, float max_m) {
     temp->vx = rand_range(max_v);
     temp->vy = rand_range(max_v);
     temp->vz = rand_range(max_v);
+    temp->ax = 0.f;
+    temp->ay = 0.f;
+    temp->az = 0.f;
     temp->m = max_m*((float) rand() / (float) RAND_MAX);
 
     return temp;
 }
 
 // updates the velocity and position of a body from its acceleration.
-inline void update_body(body_t* b, del_t t, float a[]) {
-    b->vx += a[0]*t;
-    b->vy += a[1]*t;
-    b->vz += a[2]*t;
+inline void update_body(body_t* b, del_t t) {
+    b->vx += b->ax*t;
+    b->vy += b->ay*t;
+    b->vz += b->az*t;
     b->px += b->vx*t;
     b->py += b->vy*t;
     b->pz += b->vz*t;
+    b->ax = 0.f;
+    b->ay = 0.f;
+    b->az = 0.f;
 
     if (b->px > LEN_MAX) {
         b->px = LEN_MAX;
@@ -100,7 +106,7 @@ void init_node(node_t *node, body_t **p_bodies, uint32_t p_nbodies, uint8_t dept
     node->child = 0;        // pointer to child nodes initialized to null
     node->num_child = 0;    // number of child nodes
 
-    if (n == 1) {
+    if (n == 1) {           // only 1 body in node; recursion stop condition
         body_t *b = p_bodies[0];
         node->cx = b->px;
         node->cy = b->py;
@@ -203,7 +209,7 @@ void free_node(node_t *node) {
  * guaranteed with -O2 as long as check_node is called at the end and no lines
  * follow it. >90% of the time is spent in this subroutine.
  */
-void check_node(node_t *node, body_t *body, float *a, float *length) {
+void check_node(node_t *node, body_t *body, float *length) {
     node_t temp = *node;
     float rx = temp.cx - body->px;
     float ry = temp.cy - body->py;
@@ -213,14 +219,14 @@ void check_node(node_t *node, body_t *body, float *a, float *length) {
         r = 1.f/sqrtf(r + E_SQR);
         if (temp.num_child != 0 && length[temp.depth]*r > DIST_THRES) {
             for (uint8_t i = 0; i < temp.num_child; i++) {
-                check_node(&temp.child[i], body, a, length);
+                check_node(&temp.child[i], body, length);
             }
         }
         else {// r != E | (ratio > DIST_THRES & temp->num_child > 0)
-            float gmr = temp.gm*r*r*r;
-            a[0] += gmr*rx;
-            a[1] += gmr*ry;
-            a[2] += gmr*rz;
+            float gmr = temp.gm*(r*r*r);
+            body->ax += gmr*rx;
+            body->ay += gmr*ry;
+            body->az += gmr*rz;
         }
     }
 }
@@ -287,36 +293,31 @@ void print_nbodysys(nbodysys_t *nb) {
 void brute(nbodysys_t *nb, uint32_t iters, del_t time) {
     uint32_t iter=0, i, j, n;
     n = nb->num_bodies;
-    float **a = malloc(n*sizeof(float *));
-    float *data = malloc(n*3*sizeof(float));
-    for (i = 0; i < n; i++) a[i] = &data[i*3];
+    float *gm = malloc(n*sizeof(float));
+    for (i = 0; i < n; i++) {
+        gm[i] = G*nb->bodies[i].m;
+    }
     while (iter++ < iters) {
+#pragma omp parallel for collapse(2)
         for (i = 0; i < n; i++) {
-            a[i][0] = 0.f; a[i][1] = 0.f; a[i][2] = 0.f;
-        }
-#pragma omp parallel for private(j)
-        for (i = 0; i < n; i++) {
-            body_t temp = nb->bodies[i];
-#pragma omp parallel for
             for (j = 0; j < n; j++) {
                 if (i != j) {
-                    float rx = nb->bodies[j].px - temp.px;
-                    float ry = nb->bodies[j].py - temp.py;
-                    float rz = nb->bodies[j].pz - temp.pz;
+                    float rx = nb->bodies[j].px - nb->bodies[i].px;
+                    float ry = nb->bodies[j].py - nb->bodies[i].py;
+                    float rz = nb->bodies[j].pz - nb->bodies[i].pz;
                     float r = 1.f/sqrtf(rx*rx + ry*ry + rz*rz + E_SQR);
-                    float gmr = G*nb->bodies[j].m*r*r*r;
-                    a[i][0] += gmr*rx;
-                    a[i][1] += gmr*ry;
-                    a[i][2] += gmr*rz;
+                    float gmr = gm[j]*(r*r*r);
+                    nb->bodies[i].ax += gmr*rx;
+                    nb->bodies[i].ay += gmr*ry;
+                    nb->bodies[i].az += gmr*rz;
                 }
             }
         }
 #pragma omp parallel for
         for (i = 0; i < n; i++)
-            update_body(&nb->bodies[i], time, a[i]);
+            update_body(&nb->bodies[i], time);
     }
-    free(a[0]);
-    free(a);
+    free(gm);
 }
 
 void barnes(nbodysys_t *nb, uint32_t iters, del_t time) {
@@ -337,9 +338,6 @@ void barnes(nbodysys_t *nb, uint32_t iters, del_t time) {
     // acceleration is calculated each iteration and its value is assumed to be
     // independent of its previous value (starts from 0).
     float pos[3] = { 0.f };
-    float **a = malloc(n*sizeof(float *));
-    float *data = malloc(n*3*sizeof(float));
-    for (i = 0; i < n; i++) a[i] = &data[i*3];
 
     // boolean truth table to determine a quadrant's position relative to the
     // center of the node, with a unique 3-bit value (in 3 dimensions) for each
@@ -358,19 +356,16 @@ void barnes(nbodysys_t *nb, uint32_t iters, del_t time) {
         body_t **root_bodies = malloc(n*sizeof(body_t *));
         for (i = 0; i < n; i++){
             root_bodies[i] = &nb->bodies[i];
-            a[i][0] = 0.f; a[i][1] = 0.f; a[i][2] = 0.f;
         }
         init_node(root_node, root_bodies, n, 0, max_dep, pos, magic, length, g);
 #pragma omp parallel for
         for (i = 0; i < n; i++)
-            check_node(root_node, &nb->bodies[i], a[i], length);
+            check_node(root_node, &nb->bodies[i], length);
 #pragma omp parallel for
         for (i = 0; i < n; i++)
-            update_body(&nb->bodies[i], time, a[i]);
+            update_body(&nb->bodies[i], time);
         free_node(root_node);
     }
-    free(a[0]);
-    free(a);
     free(length);
     free(root_node);
 }
