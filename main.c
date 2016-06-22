@@ -39,12 +39,12 @@ void read_file(nbodysys_t* nb, char* file) {
             newnum = strtok(NULL, ",");
             nb->bodies[i].pz = strtof(newnum, NULL);
             newnum = strtok(NULL, ",");
-            /*nb->bodies[i].vx = strtof(newnum, NULL);
+            nb->bodies[i].vx = strtof(newnum, NULL);
             newnum = strtok(NULL, ",");
             nb->bodies[i].vy = strtof(newnum, NULL);
             newnum = strtok(NULL, ",");
             nb->bodies[i].vz = strtof(newnum, NULL);
-            newnum = strtok(NULL, ",");*/
+            newnum = strtok(NULL, ",");
             nb->bodies[i].m = strtof(newnum, NULL);
             newline = strtok(NULL, "\n");
             i++;

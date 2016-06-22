@@ -19,7 +19,7 @@ static uint32_t node_id = 0;
 static uint8_t debug = DEBUG;
 //static uint32_t node_counter;
 
-// carmack method for fast inverse square root (basically newton's method)
+/* carmack method for fast inverse square root (basically newton's method)
 static inline float rsqrt(float x) {
     float hx = 0.5f*x;
     uint32_t i = *(uint32_t*)&x;
@@ -27,7 +27,7 @@ static inline float rsqrt(float x) {
     x = *(float*)&i;
     x *= (1.5f - hx*x*x);
     return x;
-}
+}*/
 
 static inline float rand_range(float max) {
     return max*(((float)rand() / (float)RAND_MAX) - 0.5f);
@@ -87,13 +87,9 @@ inline void update_body(body_t* b, del_t t) {
     }
 }
 
-// function that initializes a node and returns a pointer to it. this function
-// is kept separate from the recursive call to ensure the pointer can be freed
-// before the call takes place.
-// recursively divide bodies uint32_to quadrants and create new child nodes from
-// each of these quadrants. stops when maximum node depth is reached or when
-// exactly one body is found in quadrant. quadrants with no bodies are not
-// initialized as nodes.
+// function that recursively initializes a node and its children (if any).
+// stops when maximum node depth is reached or when exactly one body is found
+// in quadrant; quadrants with no bodies are not initialized as nodes.
 void init_node(node_t *node, body_t **p_bodies, uint32_t p_nbodies, uint8_t depth, uint8_t max_depth, float pos[], ttable_t magic, float *length, float g) {
     uint32_t i;             // bodies iterator
     uint8_t q;              // quadrants iterator
@@ -113,79 +109,78 @@ void init_node(node_t *node, body_t **p_bodies, uint32_t p_nbodies, uint8_t dept
         free(p_bodies);
         return;
     }
-    else if (n > 1) {
-        // calculate center of mass for each axis and total mass
-        float t_tm = 0.f;
-        float t_cx = 0.f;
-        float t_cy = 0.f;
-        float t_cz = 0.f;
 
-        for (i = 0; i < n; i++) {
-            float t_m = p_bodies[i]->m;
-            t_cx += p_bodies[i]->px*t_m;
-            t_cy += p_bodies[i]->py*t_m;
-            t_cz += p_bodies[i]->pz*t_m;
-            t_tm += t_m;
-        }
-        float invtm = 1.f/t_tm;
-        node->cx = t_cx*invtm;
-        node->cy = t_cy*invtm;
-        node->cz = t_cz*invtm;
-        node->gm = g*t_tm;
+    // calculate center of mass for each axis and total mass
+    float t_tm = 0.f;
+    float t_cx = 0.f;
+    float t_cy = 0.f;
+    float t_cz = 0.f;
 
-        if (depth >= max_depth) {
-            free(p_bodies);
-            return;
-        }
+    for (i = 0; i < n; i++) {
+        float t_m = p_bodies[i]->m;
+        t_cx += p_bodies[i]->px*t_m;
+        t_cy += p_bodies[i]->py*t_m;
+        t_cz += p_bodies[i]->pz*t_m;
+        t_tm += t_m;
+    }
+    float invtm = 1.f/t_tm;
+    node->cx = t_cx*invtm;
+    node->cy = t_cy*invtm;
+    node->cz = t_cz*invtm;
+    node->gm = g*t_tm;
 
-        // quad keeps tracks of which bodies are in which quadrants by
-        // index. num_quad keeps track of the number of bodies in each
-        // of quad's quadrants.
-        body_t **quad[8];
-        uint32_t num_quad[8] = { 0 };
-        for (q = 0; q < 8; q++) {
-            quad[q] = malloc(n*sizeof(body_t *));
-        }
-        for (i = 0; i < n; i++) {
-            body_t *b = p_bodies[i];
-            // derive quadrant q=0..7 from relative position on each axis
-            // of body to center of current node
-            bool b_x = b->px > pos[0];
-            bool b_y = b->py > pos[1];
-            bool b_z = b->pz > pos[2];
-            // each quadrant is mapped to a number between 0..7
-            uint8_t q = b_x*4 + b_y*2 + b_z;
-            // keep track of all bodies in each quadrant q
-            quad[q][num_quad[q]] = b;
-            // keep track of number of bodies in each quadrant q
-            num_quad[q]++;
-        }
+    if (depth >= max_depth) {
         free(p_bodies);
+        return;
+    }
 
-        uint8_t c = 0, nq[8];
-        float n_pos[8][3];
-        float len = 0.25f*length[depth];
-        for (q = 0; q < 8; q++) {
-            if (num_quad[q] > 0) {
-                // magic functions to determine new position based on
-                // quadrant and length/size of node
-                n_pos[c][0] = pos[0] + len*magic.x[q];
-                n_pos[c][1] = pos[1] + len*magic.y[q];
-                n_pos[c][2] = pos[2] + len*magic.z[q];
-                nq[c] = q;
-                c++;
-            }
-            else free(quad[q]);
+    // quad keeps tracks of which bodies are in which quadrants and saves a
+    // copy of the body's pointer. num_quad keeps track of the number of
+    // bodies in each of quad's quadrants.
+    body_t **quad[8];
+    uint32_t num_quad[8] = { 0 };
+    for (q = 0; q < 8; q++) {
+        quad[q] = malloc(n*sizeof(body_t *));
+    }
+    for (i = 0; i < n; i++) {
+        body_t *b = p_bodies[i];
+        // derive quadrant q=0..7 from relative position on each axis
+        // of body to center of current node
+        bool b_x = b->px > pos[0];
+        bool b_y = b->py > pos[1];
+        bool b_z = b->pz > pos[2];
+        // each quadrant is mapped to a number between 0..7
+        unsigned char q = b_x*4 + b_y*2 + b_z;
+        // keep track of all bodies in each quadrant q
+        quad[q][num_quad[q]] = b;
+        // keep track of number of bodies in each quadrant q
+        num_quad[q]++;
+    }
+    free(p_bodies);
+
+    uint8_t c = 0, nq[8];
+    float n_pos[8][3];
+    float len = 0.25f*length[depth];
+    for (q = 0; q < 8; q++) {
+        if (num_quad[q] > 0) {
+            // magic functions to determine new position based on
+            // quadrant and length/size of node
+            n_pos[c][0] = pos[0] + len*magic.x[q];
+            n_pos[c][1] = pos[1] + len*magic.y[q];
+            n_pos[c][2] = pos[2] + len*magic.z[q];
+            nq[c] = q;
+            c++;
         }
-        // allocate new nodes
-        node->child = malloc(c*sizeof(node_t));
-        node->num_child = c;
+        else free(quad[q]);
+    }
+    // allocate new nodes
+    node->child = malloc(c*sizeof(node_t));
+    node->num_child = c;
 #pragma omp parallel for
-        for (q = 0; q < c; q++) {
-            // initialize new nodes the recursive call *MUST BE PLACED LAST* to
-            // ensure the tail call optimization
-            init_node(&node->child[q], quad[nq[q]], num_quad[nq[q]], depth+1, max_depth, n_pos[q], magic, length, g);
-        }
+    for (q = 0; q < c; q++) {
+        // initialize new nodes the recursive call *MUST BE PLACED LAST* to
+        // ensure the tail call optimization
+        init_node(&node->child[q], quad[nq[q]], num_quad[nq[q]], depth+1, max_depth, n_pos[q], magic, length, g);
     }
 }
 
@@ -288,35 +283,33 @@ void print_nbodysys(nbodysys_t *nb) {
 }
 
 void brute(nbodysys_t *nb, uint32_t iters, del_t time) {
-    uint32_t iter=0, i, j, k, n;
+    uint32_t iter=0, i, j, n;
     n = nb->num_bodies;
-    uint32_t n1 = n-1;
-    uint32_t n_iter = n*n1/2;
+    uint32_t k, n1 = n-1;
+    double div_n1 = 1./n1;
+
     float *gm = malloc(n*sizeof(float));
     for (i = 0; i < n; i++) {
         gm[i] = G*nb->bodies[i].m;
     }
+
     while (iter++ < iters) {
 #pragma omp parallel for private(i,j)
-        for (k = 0; k < n_iter; k++) {
-            i = k/n1; j = k%n1;
-            if (j >= i) {
-                i = n1 - i;
-                j = n1 - j - 1;
-            }
-            float rx = nb->bodies[i].px - nb->bodies[j].px;
-            float ry = nb->bodies[i].py - nb->bodies[j].py;
-            float rz = nb->bodies[i].pz - nb->bodies[j].pz;
+        for (k = 0; k < n*n1/2; k++) {
+            i = k*div_n1; j = k-i*n1;
+            if (j >= i) i = n1-i, j = n1-j-1;
+            float rx = nb->bodies[j].px - nb->bodies[i].px;
+            float ry = nb->bodies[j].py - nb->bodies[i].py;
+            float rz = nb->bodies[j].pz - nb->bodies[i].pz;
             float r = 1.f/sqrtf(rx*rx + ry*ry + rz*rz + E_SQR);
-            r *= r*r;
-            float gmr = nb->bodies[j].m*G*r;
-            nb->bodies[i].ax -= gmr*rx;
-            nb->bodies[i].ay -= gmr*ry;
-            nb->bodies[i].az -= gmr*rz;
-            gmr = nb->bodies[i].m*G*r;
-            nb->bodies[j].ax += gmr*rx;
-            nb->bodies[j].ay += gmr*ry;
-            nb->bodies[j].az += gmr*rz;
+            float r3 = r*r*r;
+            float gmr[2] = {gm[j]*r3, -gm[i]*r3};
+            nb->bodies[i].ax += gmr[0]*rx;
+            nb->bodies[i].ay += gmr[0]*ry;
+            nb->bodies[i].az += gmr[0]*rz;
+            nb->bodies[j].ax += gmr[1]*rx;
+            nb->bodies[j].ay += gmr[1]*ry;
+            nb->bodies[j].az += gmr[1]*rz;
         }
 #pragma omp parallel for
         for (i = 0; i < n; i++)
@@ -333,7 +326,7 @@ void barnes(nbodysys_t *nb, uint32_t iters, del_t time) {
     //omp_set_nested(1);
 
     // maximum tree depth should be proportional to the number of nodes to the
-    // inverse power of eight. the size of a node is proportional to its depth
+    // root of eight. the length of a node is proportional to its depth
     uint8_t max_dep = (uint8_t)ceil(DEPTH*pow(nb->num_bodies, 0.125));
     float *length = malloc(max_dep*sizeof(float));
     for (uint8_t d = 0; d < max_dep; d++) {
@@ -341,8 +334,7 @@ void barnes(nbodysys_t *nb, uint32_t iters, del_t time) {
     }
     if (debug == 2) printf("max depth: %d\n", max_dep);
 
-    // acceleration is calculated each iteration and its value is assumed to be
-    // independent of its previous value (starts from 0).
+    // centre of nbodysys determines position (centres) of subsequent nodes
     float pos[3] = { 0.f };
 
     // boolean truth table to determine a quadrant's position relative to the
@@ -359,6 +351,9 @@ void barnes(nbodysys_t *nb, uint32_t iters, del_t time) {
     printf("pow!\n");
     while (iter++ < iters) {
         node_id = 0;
+        // a list of pointers to bodies contained in root node and used to
+        // generate subsequent nodes. allocated here but freed during the call
+        // to init node.
         body_t **root_bodies = malloc(n*sizeof(body_t *));
         for (i = 0; i < n; i++){
             root_bodies[i] = &nb->bodies[i];

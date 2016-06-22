@@ -36,8 +36,8 @@ typedef struct {
 
 typedef struct {
     body_t *bodies;
-    uint32_t num_bodies;
     float maxp, maxv, maxm;
+    uint32_t num_bodies;
 } nbodysys_t;
 
 typedef void (*update) (nbodysys_t *nb, uint32_t iters, del_t time, uint32_t* opt);
